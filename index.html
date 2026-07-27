@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>health-mention</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <nav class="tabs">
+      <button class="tab active" data-tab="settings">设置</button>
+      <button class="tab" data-tab="logs">记录</button>
+    </nav>
+
+    <main id="tab-settings" class="tab-panel">
+      <section class="card">
+        <h2>休息提醒</h2>
+        <label class="row">
+          <input type="checkbox" id="break-enabled" />
+          <span>启用提醒</span>
+        </label>
+        <label class="row">
+          <span>间隔（分钟）</span>
+          <input type="number" id="interval-min" min="1" max="1440" />
+        </label>
+        <label class="row">
+          <span>休息时长（秒）</span>
+          <input type="number" id="duration-sec" min="5" max="3600" />
+        </label>
+        <label class="row">
+          <span>休息窗口形态</span>
+          <select id="overlay-mode">
+            <option value="float">小浮窗置顶</option>
+            <option value="fullscreen">全屏遮罩</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>系统</h2>
+        <label class="row">
+          <input type="checkbox" id="autostart" />
+          <span>跟随系统自启动</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>外观与扩展</h2>
+        <label class="row">
+          <span>主题</span>
+          <select id="theme" disabled>
+            <option value="default">默认（M4 开放）</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>进度组件</span>
+          <select id="progress-plugin" disabled>
+            <option value="">内置默认（M4 开放）</option>
+          </select>
+        </label>
+        <p class="hint">全局快捷键将在 M3 提供。</p>
+      </section>
+
+      <div class="actions">
+        <button id="save-btn" class="primary">保存</button>
+        <span id="save-status" class="hint"></span>
+      </div>
+    </main>
+
+    <main id="tab-logs" class="tab-panel hidden">
+      <p class="hint">休息记录与统计将在 M3 提供。</p>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
