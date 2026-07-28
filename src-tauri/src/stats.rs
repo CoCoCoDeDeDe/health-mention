@@ -4,15 +4,22 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-/// 读取某月记录（None = 当月），最新在前。坏行跳过。
-pub fn list_logs(logs_dir: &Path, month: Option<String>) -> Result<Vec<LogRecord>, String> {
-    let month = month.unwrap_or_else(|| chrono::Local::now().format("%Y-%m").to_string());
+/// 读取某日记录（None = 今天），最新在前。坏行跳过。
+pub fn list_logs(logs_dir: &Path, date: Option<String>) -> Result<Vec<LogRecord>, String> {
+    let date = date.unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d").to_string());
+    let target = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|_| format!("日期格式无效：{date}"))?;
+    let month = date.get(..7).ok_or("日期格式无效")?;
     let path = logs_dir.join(format!("{month}.jsonl"));
     let mut out = Vec::new();
     if let Ok(content) = fs::read_to_string(&path) {
         for line in content.lines() {
             if let Ok(r) = serde_json::from_str::<LogRecord>(line) {
-                out.push(r);
+                if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&r.ts) {
+                    if ts.with_timezone(&chrono::Local).date_naive() == target {
+                        out.push(r);
+                    }
+                }
             }
         }
     }

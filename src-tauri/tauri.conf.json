@@ -16,19 +16,9 @@
         "title": "health-mention",
         "width": 420,
         "height": 600,
-        "resizable": false,
-        "visible": false
-      },
-      {
-        "label": "overlay",
-        "title": "休息一下",
-        "url": "overlay.html",
-        "width": 380,
-        "height": 150,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "resizable": false,
-        "skipTaskbar": true,
+        "minWidth": 360,
+        "minHeight": 480,
+        "resizable": true,
         "visible": false
       }
     ],

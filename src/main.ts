@@ -200,15 +200,15 @@ pollSchedule();
 
 // ---- logs & stats ----
 
-function currentMonth(): string {
+function currentDate(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 async function loadLogs(): Promise<void> {
-  const month = el<HTMLInputElement>("log-month").value || null;
+  const date = el<HTMLInputElement>("log-date").value || null;
   const [logs, stats] = await Promise.all([
-    invoke<LogRecord[]>("list_logs", { month }),
+    invoke<LogRecord[]>("list_logs", { date }),
     invoke<Stats>("get_stats"),
   ]);
   el("stats-line").textContent = `今日完成 ${stats.todayDone} 次 · 连续坚持 ${stats.streakDays} 天`;
@@ -221,7 +221,7 @@ async function loadLogs(): Promise<void> {
   }
   for (const r of logs) {
     const d = new Date(r.ts);
-    const time = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     const trigger = r.trigger === "manual" ? "手动" : "定时";
     const result = r.result === "done" ? "完成" : "提前结束";
     const row = document.createElement("div");
@@ -231,5 +231,5 @@ async function loadLogs(): Promise<void> {
   }
 }
 
-el<HTMLInputElement>("log-month").value = currentMonth();
-el("log-month").addEventListener("change", () => loadLogs().catch(console.error));
+el<HTMLInputElement>("log-date").value = currentDate();
+el("log-date").addEventListener("change", () => loadLogs().catch(console.error));

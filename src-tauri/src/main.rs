@@ -97,8 +97,8 @@ fn get_schedule_state(state: State<AppState>) -> ScheduleTickPayload {
 }
 
 #[tauri::command]
-fn list_logs(state: State<AppState>, month: Option<String>) -> Result<Vec<storage::LogRecord>, String> {
-    stats::list_logs(&state.logs_dir, month)
+fn list_logs(state: State<AppState>, date: Option<String>) -> Result<Vec<storage::LogRecord>, String> {
+    stats::list_logs(&state.logs_dir, date)
 }
 
 #[tauri::command]
@@ -218,12 +218,22 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                if window.label() == "overlay" {
-                    // overlay 被关闭（如 Alt+F4）视为提前结束
-                    session::end_session(window.app_handle(), "stopped");
+                if window.label().starts_with("overlay") {
+                    // overlay 被关闭（如 Alt+F4）视为提前结束；无会话时允许直接关闭
+                    let has_session = window
+                        .app_handle()
+                        .state::<AppState>()
+                        .session
+                        .lock()
+                        .unwrap()
+                        .is_some();
+                    if has_session {
+                        api.prevent_close();
+                        session::end_session(window.app_handle(), "stopped");
+                    }
                 } else {
                     // 主窗口关闭转隐藏到托盘
+                    api.prevent_close();
                     let _ = window.hide();
                 }
             }

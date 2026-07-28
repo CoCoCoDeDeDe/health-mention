@@ -1,7 +1,7 @@
 use crate::{session, settings, AppState};
 use tauri::{
     menu::{CheckMenuItemBuilder, Menu, MenuItemBuilder, PredefinedMenuItem},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
 };
 
@@ -30,6 +30,16 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             "toggle_pause" => toggle_pause(app),
             "quit" => app.exit(0),
             _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            // 双击左键直接打开设置窗口
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
         });
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());

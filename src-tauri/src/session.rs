@@ -1,7 +1,10 @@
 use crate::{settings::Settings, storage, AppState};
 use serde::Serialize;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+
+const FLOAT_W: f64 = 320.0;
+const FLOAT_H: f64 = 44.0;
 
 /// 进行中的休息会话。
 pub struct ActiveSession {
@@ -31,18 +34,20 @@ pub struct BreakEndPayload {
 pub struct BreakStatePayload {
     pub planned_sec: f64,
     pub elapsed_sec: f64,
+    pub mode: String,
 }
 
 pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
-    app.state::<AppState>()
-        .session
-        .lock()
-        .unwrap()
-        .as_ref()
-        .map(|s| BreakStatePayload {
+    let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    session.as_ref().map(|s| {
+        let mode = state.settings.lock().unwrap().global.overlay_mode.clone();
+        BreakStatePayload {
             planned_sec: s.planned_sec,
             elapsed_sec: s.started.elapsed().as_secs_f64(),
-        })
+            mode,
+        }
+    })
 }
 
 /// 开启一个休息会话；已有会话进行中时忽略。
@@ -68,7 +73,7 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
         (seq, planned, mode)
     };
 
-    show_overlay(app, &mode);
+    show_overlays(app, &mode);
     let _ = app.emit(
         "break://start",
         BreakStartPayload {
@@ -92,7 +97,7 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
     });
 }
 
-/// 结束当前会话：写记录、隐藏 overlay、重置计时器。
+/// 结束当前会话：写记录、销毁所有 overlay、重置计时器。
 pub fn end_session(app: &AppHandle, result: &str) {
     let state = app.state::<AppState>();
     let session = state.session.lock().unwrap().take();
@@ -109,7 +114,7 @@ pub fn end_session(app: &AppHandle, result: &str) {
         eprintln!("append log failed: {e}");
     }
 
-    hide_overlay(app);
+    hide_overlays(app);
     let _ = app.emit(
         "break://end",
         BreakEndPayload {
@@ -121,21 +126,59 @@ pub fn end_session(app: &AppHandle, result: &str) {
     state.scheduler.lock().unwrap().reload(&settings);
 }
 
-fn show_overlay(app: &AppHandle, mode: &str) {
-    if let Some(win) = app.get_webview_window("overlay") {
-        if mode == "fullscreen" {
-            let _ = win.set_fullscreen(true);
-        } else {
-            let _ = win.set_fullscreen(false);
-            let _ = win.center();
-        }
-        let _ = win.show();
-        let _ = win.set_focus();
+/// 每个显示器各创建一个 overlay 窗口：初始同尺寸、各自居中，
+/// 之后移动/调整各自独立。
+fn show_overlays(app: &AppHandle, mode: &str) {
+    let monitors = app.available_monitors().unwrap_or_default();
+    if monitors.is_empty() {
+        // 兜底：拿不到显示器信息时至少创建一个默认位置的窗口
+        build_overlay(app, "overlay-0", mode, None);
+        return;
+    }
+    for (i, monitor) in monitors.iter().enumerate() {
+        build_overlay(app, &format!("overlay-{i}"), mode, Some(monitor));
     }
 }
 
-fn hide_overlay(app: &AppHandle) {
-    if let Some(win) = app.get_webview_window("overlay") {
-        let _ = win.hide();
+fn build_overlay(
+    app: &AppHandle,
+    label: &str,
+    mode: &str,
+    monitor: Option<&tauri::Monitor>,
+) {
+    if app.get_webview_window(label).is_some() {
+        return;
+    }
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("overlay.html".into()))
+        .title("休息一下")
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(true)
+        .visible(true);
+    if mode == "fullscreen" {
+        builder = builder.fullscreen(true);
+    } else if let Some(m) = monitor {
+        let scale = m.scale_factor();
+        let mw = m.size().width as f64 / scale;
+        let mh = m.size().height as f64 / scale;
+        let mx = m.position().x as f64 / scale;
+        let my = m.position().y as f64 / scale;
+        builder = builder
+            .inner_size(FLOAT_W, FLOAT_H)
+            .position(mx + (mw - FLOAT_W) / 2.0, my + (mh - FLOAT_H) / 2.0);
+    } else {
+        builder = builder.inner_size(FLOAT_W, FLOAT_H);
+    }
+    if let Err(e) = builder.build() {
+        eprintln!("create overlay window {label} failed: {e}");
+    }
+}
+
+fn hide_overlays(app: &AppHandle) {
+    for (label, win) in app.webview_windows() {
+        if label.starts_with("overlay") {
+            let _ = win.destroy();
+        }
     }
 }

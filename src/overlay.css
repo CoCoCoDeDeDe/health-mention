@@ -1,12 +1,9 @@
-/* overlay：深绿低亮度底色，小浮窗与全屏遮罩共用 */
+/* overlay：只有一根进度条。浮窗模式占满小窗，全屏模式居中一根大条 */
 :root {
   --bg: #2e3a30;
-  --card: #3a4a3d;
-  --fg: #e8efe4;
-  --fg-dim: #a9b8aa;
-  --accent: #8fbf97;
   --track: #263026;
-  --radius: 12px;
+  --accent: #8fbf97;
+  --grip: #a9b8aa;
 }
 
 * {
@@ -20,69 +17,65 @@ body {
 }
 
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--bg);
-  color: var(--fg);
-  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+  position: relative;
   user-select: none;
 }
 
-.card {
-  width: 100%;
-  max-width: 420px;
-  padding: 24px 28px;
-  background: var(--card);
-  border-radius: var(--radius);
-}
-
-.title {
-  margin: 0 0 14px;
-  font-size: 15px;
-  color: var(--fg);
-  text-align: center;
-  letter-spacing: 2px;
-}
-
-.bar-track {
-  height: 10px;
+#bar-track {
+  position: absolute;
+  inset: 6px;
   background: var(--track);
-  border-radius: 5px;
+  border-radius: 6px;
   overflow: hidden;
+  cursor: move;
 }
 
-.bar-fill {
+#bar {
   height: 100%;
   width: 0%;
   background: var(--accent);
-  border-radius: 5px;
+  border-radius: 6px;
   transition: width 0.2s linear;
 }
 
-.footer {
+#grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--grip) 50%);
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+#grip:hover {
+  opacity: 1;
+}
+
+/* 全屏遮罩：居中一根大进度条，不可拖拽 */
+body.fullscreen {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 14px;
+  justify-content: center;
 }
 
-.time {
-  font-size: 13px;
-  color: var(--fg-dim);
+body.fullscreen #bar-track {
+  position: static;
+  inset: auto;
+  width: 60%;
+  max-width: 640px;
+  height: 14px;
+  cursor: default;
 }
 
-#end-btn {
-  padding: 5px 16px;
-  border: 1px solid var(--fg-dim);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--fg-dim);
-  font-size: 12px;
-  cursor: pointer;
+body.fullscreen #grip {
+  display: none;
 }
 
-#end-btn:hover {
-  border-color: var(--fg);
-  color: var(--fg);
+.hidden {
+  display: none;
 }
