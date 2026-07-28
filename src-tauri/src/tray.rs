@@ -1,4 +1,4 @@
-use crate::{settings, AppState};
+use crate::{session, settings, AppState};
 use tauri::{
     menu::{CheckMenuItemBuilder, Menu, MenuItemBuilder, PredefinedMenuItem},
     tray::TrayIconBuilder,
@@ -11,10 +11,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let paused = app.state::<AppState>().settings.lock().unwrap().global.paused;
 
     let show = MenuItemBuilder::with_id("show", "打开设置").build(app)?;
-    // M2 接入调度器后启用
-    let break_now = MenuItemBuilder::with_id("break_now", "立即休息")
-        .enabled(false)
-        .build(app)?;
+    let break_now = MenuItemBuilder::with_id("break_now", "立即休息").build(app)?;
     let pause = CheckMenuItemBuilder::with_id("toggle_pause", "暂停提醒")
         .checked(paused)
         .build(app)?;
@@ -27,6 +24,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .tooltip("health-mention")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main_window(app),
+            "break_now" => session::start_session(app, "manual"),
             "toggle_pause" => toggle_pause(app),
             "quit" => app.exit(0),
             _ => {}
@@ -47,7 +45,11 @@ pub fn show_main_window(app: &AppHandle) {
 
 fn toggle_pause(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let mut settings_guard = state.settings.lock().unwrap();
-    settings_guard.global.paused = !settings_guard.global.paused;
-    let _ = settings::save(&state.settings_path, &settings_guard);
+    let settings = {
+        let mut settings_guard = state.settings.lock().unwrap();
+        settings_guard.global.paused = !settings_guard.global.paused;
+        let _ = settings::save(&state.settings_path, &settings_guard);
+        settings_guard.clone()
+    };
+    state.scheduler.lock().unwrap().reload(&settings);
 }

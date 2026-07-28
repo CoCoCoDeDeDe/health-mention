@@ -1,0 +1,88 @@
+/* overlay：深绿低亮度底色，小浮窗与全屏遮罩共用 */
+:root {
+  --bg: #2e3a30;
+  --card: #3a4a3d;
+  --fg: #e8efe4;
+  --fg-dim: #a9b8aa;
+  --accent: #8fbf97;
+  --track: #263026;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  user-select: none;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px 28px;
+  background: var(--card);
+  border-radius: var(--radius);
+}
+
+.title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  color: var(--fg);
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.bar-track {
+  height: 10px;
+  background: var(--track);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 5px;
+  transition: width 0.2s linear;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.time {
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+#end-btn {
+  padding: 5px 16px;
+  border: 1px solid var(--fg-dim);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#end-btn:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
