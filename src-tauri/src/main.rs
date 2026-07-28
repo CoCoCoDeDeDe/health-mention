@@ -93,12 +93,14 @@ fn save_settings(
 
 #[tauri::command]
 fn trigger_break(app: tauri::AppHandle) {
-    let _ = app.run_on_main_thread(move || session::start_session(&app, "manual"));
+    let h = app.clone();
+    let _ = app.run_on_main_thread(move || session::start_session(&h, "manual"));
 }
 
 #[tauri::command]
 fn end_break(app: tauri::AppHandle) {
-    let _ = app.run_on_main_thread(move || session::end_session(&app, "stopped"));
+    let h = app.clone();
+    let _ = app.run_on_main_thread(move || session::end_session(&h, "stopped"));
 }
 
 #[tauri::command]
@@ -128,7 +130,8 @@ fn clear_logs(app: tauri::AppHandle) -> Result<(), String> {
         let state = app.state::<AppState>();
         stats::clear_logs(&state.logs_dir)?;
     }
-    let _ = app.run_on_main_thread(move || tray::update_stats_item(&app));
+    let h = app.clone();
+    let _ = app.run_on_main_thread(move || tray::update_stats_item(&h));
     Ok(())
 }
 
@@ -148,7 +151,8 @@ fn save_overlay_rect(
 
 #[tauri::command]
 fn set_overlay_preview(app: tauri::AppHandle, open: bool) {
-    let _ = app.run_on_main_thread(move || session::set_preview(&app, open));
+    let h = app.clone();
+    let _ = app.run_on_main_thread(move || session::set_preview(&h, open));
 }
 
 #[tauri::command]
@@ -226,10 +230,10 @@ fn main() {
                 .with_handler(|app, shortcut, event| {
                     if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                         // global-hotkey 在独立线程回调，窗口操作收敛到主线程
-                        let app = app.clone();
+                        let h = app.clone();
                         let shortcut = shortcut.clone();
                         let _ = app.run_on_main_thread(move || {
-                            hotkey::handle_shortcut(&app, &shortcut);
+                            hotkey::handle_shortcut(&h, &shortcut);
                         });
                     }
                 })
