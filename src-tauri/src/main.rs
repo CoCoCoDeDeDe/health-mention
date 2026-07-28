@@ -24,7 +24,7 @@ pub struct AppState {
     pub session: Mutex<Option<ActiveSession>>,
     pub session_seq: Mutex<u64>,
     /// 托盘「暂停提醒」勾选框句柄，用于快捷键切换时同步勾选状态
-    pub pause_item: Mutex<Option<CheckMenuItem>>,
+    pub pause_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
 }
 
 #[derive(Serialize, Clone)]
