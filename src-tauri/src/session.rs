@@ -82,7 +82,8 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs_f64(planned_sec));
         let still_active = {
-            let session = app_clone.state::<AppState>().session.lock().unwrap();
+            let state = app_clone.state::<AppState>();
+            let session = state.session.lock().unwrap();
             matches!(session.as_ref(), Some(s) if s.seq == seq)
         };
         if still_active {
