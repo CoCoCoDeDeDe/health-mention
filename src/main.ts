@@ -118,6 +118,7 @@ function collectForm(): Settings {
 async function load(): Promise<void> {
   current = await invoke<Settings>("get_settings");
   fillForm(current);
+  setDirty(false);
 }
 
 async function save(): Promise<void> {
@@ -126,6 +127,7 @@ async function save(): Promise<void> {
     const settings = collectForm();
     await invoke("save_settings", { settings });
     current = settings;
+    setDirty(false);
     status.textContent = "已保存";
   } catch (e) {
     status.textContent = `保存失败：${e}`;
@@ -137,6 +139,17 @@ el("save-btn").addEventListener("click", save);
 load().catch((e) => {
   el("save-status").textContent = `加载失败：${e}`;
 });
+
+// ---- dirty state (unsaved changes indicator) ----
+
+function setDirty(v: boolean): void {
+  const btn = el<HTMLButtonElement>("save-btn");
+  btn.textContent = v ? "保存 ●" : "保存";
+  btn.classList.toggle("dirty", v);
+}
+
+el("tab-settings").addEventListener("input", () => setDirty(true));
+el("tab-settings").addEventListener("change", () => setDirty(true));
 
 // ---- hotkey capture ----
 
@@ -161,13 +174,18 @@ for (const id of Object.values(HOTKEY_INPUTS)) {
   input.addEventListener("keydown", (e) => {
     e.preventDefault();
     const acc = keyToAccelerator(e);
-    if (acc) input.value = acc;
+    if (acc) {
+      input.value = acc;
+      // 程序化赋值不触发 input 事件，手动标脏
+      setDirty(true);
+    }
   });
 }
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>(".hk-clear")) {
   btn.addEventListener("click", () => {
     el<HTMLInputElement>(btn.dataset.hk!).value = "";
+    setDirty(true);
   });
 }
 

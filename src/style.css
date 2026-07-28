@@ -104,6 +104,13 @@ button.primary:hover {
   background: var(--accent-hover);
 }
 
+/* 有未保存修改时的保存按钮 */
+button.primary.dirty {
+  background: var(--accent-hover);
+  box-shadow: 0 0 0 3px rgba(111, 165, 120, 0.35);
+  font-weight: 600;
+}
+
 .hint {
   color: var(--fg-dim);
   font-size: 12px;

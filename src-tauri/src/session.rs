@@ -197,6 +197,15 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         // 先隐藏，overlay_ready 后再显示，消除白闪
         .visible(false);
     if mode == "fullscreen" {
+        // 先定位到对应显示器再全屏，否则所有窗口都挤在主屏
+        if let Some(m) = monitor {
+            let scale = m.scale_factor();
+            let mx = m.position().x as f64 / scale;
+            let my = m.position().y as f64 / scale;
+            let mw = m.size().width as f64 / scale;
+            let mh = m.size().height as f64 / scale;
+            builder = builder.inner_size(mw, mh).position(mx, my);
+        }
         builder = builder.fullscreen(true);
     } else if let Some(r) = saved {
         builder = builder.inner_size(r.w, r.h).position(r.x, r.y);
