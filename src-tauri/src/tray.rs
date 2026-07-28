@@ -32,7 +32,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon);
+        builder = builder.icon(icon.clone());
     }
     builder.build(app)?;
     Ok(())
