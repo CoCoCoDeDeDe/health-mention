@@ -145,35 +145,39 @@ function setupDragAndResize(): void {
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      // 松开手柄立即记录，不依赖 onResized 事件
+      reportRect();
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   });
 }
 
-/** 记忆本窗口位置与宽高：移动/缩放结束即保存（300ms 防抖），另有 2s 轮询兜底 */
+/** 立即上报本窗口位置与宽高 */
+function reportRect(): void {
+  Promise.all([win.outerPosition(), win.innerSize(), win.scaleFactor()])
+    .then(([pos, size, scale]) =>
+      invoke("save_overlay_rect", {
+        label: win.label,
+        rect: {
+          x: pos.x / scale,
+          y: pos.y / scale,
+          w: size.width / scale,
+          h: size.height / scale,
+        },
+      })
+    )
+    .catch(() => {});
+}
+
+/** 记忆本窗口位置与宽高：移动/缩放事件上报（300ms 防抖），另有 2s 轮询兜底 */
 function setupRectPersistence(): void {
-  const report = () => {
-    Promise.all([win.outerPosition(), win.innerSize(), win.scaleFactor()])
-      .then(([pos, size, scale]) =>
-        invoke("save_overlay_rect", {
-          label: win.label,
-          rect: {
-            x: pos.x / scale,
-            y: pos.y / scale,
-            w: size.width / scale,
-            h: size.height / scale,
-          },
-        })
-      )
-      .catch(() => {});
-  };
   let timer: ReturnType<typeof setTimeout> | null = null;
   const debounced = () => {
     if (timer) clearTimeout(timer);
-    timer = setTimeout(report, 300);
+    timer = setTimeout(reportRect, 300);
   };
   win.onMoved(debounced).catch(() => {});
   win.onResized(debounced).catch(() => {});
-  setInterval(report, 2000);
+  setInterval(reportRect, 2000);
 }

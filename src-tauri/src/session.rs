@@ -184,6 +184,10 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         .skip_taskbar(true)
         // 禁用系统缩放边框，避免 Windows 11 贴靠布局吸附；宽高由前端 setSize 程序化调整
         .resizable(false)
+        // 去掉 DWM 阴影/描边，小尺寸下不露出半透明底盘
+        .shadow(false)
+        // 与前端拖拽最小值一致，防止窗口与 webview 尺寸脱节
+        .min_inner_size(60.0, 12.0)
         // 出现时不夺取输入焦点，避免打断用户打字
         .focused(false)
         // WebView 背景色与页面底色一致，杜绝首帧白闪
