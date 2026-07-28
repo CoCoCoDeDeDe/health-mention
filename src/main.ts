@@ -218,7 +218,7 @@ setInterval(() => {
         },
       })
     )
-    .catch(() => {});
+    .catch((e) => console.error("persist main rect failed:", e));
 }, 2000);
 
 // ---- logs & stats ----

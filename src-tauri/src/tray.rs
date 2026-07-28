@@ -48,6 +48,8 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
+        // 菜单仅右键弹出；左键单击不弹，双击直接打开设置
+        .show_menu_on_left_click(false)
         .tooltip("health-mention")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main_window(app),

@@ -167,7 +167,7 @@ function reportRect(): void {
         },
       })
     )
-    .catch(() => {});
+    .catch((e) => console.error("reportRect failed:", e));
 }
 
 /** 记忆本窗口位置与宽高：移动/缩放事件上报（300ms 防抖），另有 2s 轮询兜底 */

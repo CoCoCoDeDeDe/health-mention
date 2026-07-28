@@ -102,7 +102,7 @@ export default {
 
 ## 存储
 
-目录：`<app_data>`（Tauri path API，Windows 下为 `%APPDATA%/health-mention`）
+目录：`<app_data>`（Tauri path API，Windows 下为 `%APPDATA%/com.cococodedede.health-mention`，即 bundle identifier 命名的目录）
 
 ```
 settings.json        { version: 1, break: {...}, hotkeys: {...},
