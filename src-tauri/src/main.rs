@@ -14,7 +14,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{menu::CheckMenuItem, Manager, State};
+use tauri::{
+    menu::{CheckMenuItem, MenuItem},
+    Manager, State,
+};
 use tauri_plugin_autostart::ManagerExt;
 
 pub struct AppState {
@@ -26,9 +29,12 @@ pub struct AppState {
     pub session_seq: Mutex<u64>,
     /// 托盘「暂停提醒」勾选框句柄，用于快捷键切换时同步勾选状态
     pub pause_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
+    /// 托盘菜单顶部的倒计时/统计文本项
+    pub info_item: Mutex<Option<MenuItem<tauri::Wry>>>,
+    pub stats_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     /// 设置页「预览休息浮窗」开关状态
     pub overlay_preview: Mutex<bool>,
-    /// 各 overlay 窗口记忆的位置与宽高（按窗口标签）
+    /// 各窗口记忆的位置与宽高（按窗口标签，含 main）
     pub overlay_rects: Mutex<HashMap<String, storage::OverlayRect>>,
     pub rects_path: PathBuf,
 }
@@ -167,19 +173,28 @@ fn schedule_state(state: &AppState, in_session: bool) -> ScheduleTickPayload {
     }
 }
 
-/// 每秒更新托盘 tooltip。
+/// 每秒更新托盘 tooltip 与菜单顶部的倒计时文本。
 fn update_tray_tooltip(handle: &tauri::AppHandle, in_session: bool) {
     let payload = schedule_state(&handle.state::<AppState>(), in_session);
+    let menu_text = match payload.remaining_sec {
+        Some(s) => format!("距离下次休息：{}", fmt_hms(s)),
+        None => match payload.status {
+            "paused" => "提醒已暂停".to_string(),
+            "disabled" => "提醒已禁用".to_string(),
+            _ => "休息中".to_string(),
+        },
+    };
     if let Some(tray) = handle.tray_by_id(tray::TRAY_ID) {
-        let tooltip = match payload.remaining_sec {
-            Some(s) => format!("health-mention · {} 后休息", fmt_hms(s)),
-            None => match payload.status {
-                "paused" => "health-mention · 已暂停".to_string(),
-                "disabled" => "health-mention · 提醒已禁用".to_string(),
-                _ => "health-mention · 休息中".to_string(),
-            },
-        };
-        let _ = tray.set_tooltip(Some(&tooltip));
+        let _ = tray.set_tooltip(Some(&format!("health-mention · {menu_text}")));
+    }
+    if let Some(item) = handle
+        .state::<AppState>()
+        .info_item
+        .lock()
+        .unwrap()
+        .as_ref()
+    {
+        let _ = item.set_text(&menu_text);
     }
 }
 
@@ -215,11 +230,29 @@ fn main() {
                 session: Mutex::new(None),
                 session_seq: Mutex::new(0),
                 pause_item: Mutex::new(None),
+                info_item: Mutex::new(None),
+                stats_item: Mutex::new(None),
                 overlay_preview: Mutex::new(false),
                 overlay_rects: Mutex::new(storage::load_overlay_rects(&rects_path)),
                 rects_path,
             });
             tray::setup_tray(&app.handle())?;
+            tray::update_stats_item(&app.handle());
+
+            // 恢复主窗口记忆的位置与大小
+            if let Some(win) = app.get_webview_window("main") {
+                let rect = app
+                    .state::<AppState>()
+                    .overlay_rects
+                    .lock()
+                    .unwrap()
+                    .get("main")
+                    .copied();
+                if let Some(r) = rect {
+                    let _ = win.set_size(tauri::LogicalSize::new(r.w, r.h));
+                    let _ = win.set_position(tauri::LogicalPosition::new(r.x, r.y));
+                }
+            }
 
             // 启动时按配置注册全局快捷键
             let hotkeys = app
@@ -233,18 +266,25 @@ fn main() {
                 eprintln!("apply hotkeys failed: {e}");
             }
 
-            // 调度器 tick：每秒检查到期 + 更新托盘 tooltip
+            // 调度器 tick：每秒检查到期 + 更新托盘信息；每 60s 刷新统计文本
             let handle = app.handle().clone();
-            std::thread::spawn(move || loop {
-                std::thread::sleep(Duration::from_secs(1));
-                let state = handle.state::<AppState>();
-                let in_session = state.session.lock().unwrap().is_some();
-                let due = state.scheduler.lock().unwrap().is_due();
-                // 会话进行中到期无需处理：会话结束时会 reload 重新计时
-                if due && !in_session {
-                    session::start_session(&handle, "scheduled");
-                } else {
-                    update_tray_tooltip(&handle, in_session);
+            std::thread::spawn(move || {
+                let mut ticks = 0u64;
+                loop {
+                    std::thread::sleep(Duration::from_secs(1));
+                    ticks += 1;
+                    let state = handle.state::<AppState>();
+                    let in_session = state.session.lock().unwrap().is_some();
+                    let due = state.scheduler.lock().unwrap().is_due();
+                    // 会话进行中到期无需处理：会话结束时会 reload 重新计时
+                    if due && !in_session {
+                        session::start_session(&handle, "scheduled");
+                    } else {
+                        update_tray_tooltip(&handle, in_session);
+                    }
+                    if ticks % 60 == 1 {
+                        tray::update_stats_item(&handle);
+                    }
                 }
             });
 

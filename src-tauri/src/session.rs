@@ -1,4 +1,4 @@
-use crate::{settings::Settings, storage, AppState};
+use crate::{settings::Settings, storage, tray, AppState};
 use serde::Serialize;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -117,7 +117,7 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
     });
 }
 
-/// 结束当前会话：写记录、销毁所有 overlay、重置计时器。
+/// 结束当前会话：写记录、销毁所有 overlay、重置计时器、刷新托盘统计。
 pub fn end_session(app: &AppHandle, result: &str) {
     let state = app.state::<AppState>();
     let session = state.session.lock().unwrap().take();
@@ -144,6 +144,7 @@ pub fn end_session(app: &AppHandle, result: &str) {
 
     let settings: Settings = state.settings.lock().unwrap().clone();
     state.scheduler.lock().unwrap().reload(&settings);
+    tray::update_stats_item(app);
 }
 
 /// 每个显示器各创建一个 overlay 窗口：优先使用记忆的位置与宽高，
@@ -178,9 +179,8 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(true)
-        // 不夺取输入焦点，避免打断用户打字
+        // 出现时不夺取输入焦点，避免打断用户打字
         .focused(false)
-        .focusable(false)
         .visible(true);
     if mode == "fullscreen" {
         builder = builder.fullscreen(true);

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface BreakSettings {
   intervalMin: number;
@@ -210,6 +211,25 @@ invoke<boolean>("get_overlay_preview")
 previewBox.addEventListener("change", () => {
   invoke("set_overlay_preview", { open: previewBox.checked }).catch(console.error);
 });
+
+// ---- persist main window rect ----
+
+const mainWin = getCurrentWindow();
+setInterval(() => {
+  Promise.all([mainWin.outerPosition(), mainWin.innerSize(), mainWin.scaleFactor()])
+    .then(([pos, size, scale]) =>
+      invoke("save_overlay_rect", {
+        label: "main",
+        rect: {
+          x: pos.x / scale,
+          y: pos.y / scale,
+          w: size.width / scale,
+          h: size.height / scale,
+        },
+      })
+    )
+    .catch(() => {});
+}, 2000);
 
 // ---- logs & stats ----
 

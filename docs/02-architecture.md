@@ -52,8 +52,9 @@
   - **双击进度条 = 提前结束**；Alt+F4 关闭任一 overlay 也视为提前结束
   - 各窗口移动/调整各自独立，不同步
 - 建窗 `focused(false)` + `focusable(false)`：不夺取输入焦点
-- 位置/宽高记忆：overlay 前端每 2s 上报 rect（`save_overlay_rect`，仅变化时写 `overlay-rects.json`），建窗时优先使用
+- 位置/宽高记忆：各窗口前端每 2s 上报 rect（`save_overlay_rect`，仅变化时写 `overlay-rects.json`），overlay 建窗与 main 窗口启动时优先使用
 - 预览：设置页「预览休息浮窗」开关（`set/get_overlay_preview`），无会话时 overlay 显示静态半条用于调整；会话开始时自动关闭预览并重建窗口
+- 注：建窗只用 `focused(false)`；`focusable(false)` 在 Windows 上会导致窗口白屏卡死，勿用
 - capabilities 用 `overlay-*` 匹配动态窗口标签，附加 `start-dragging` / `set-size` / `close` 权限
 
 ## 全局快捷键
