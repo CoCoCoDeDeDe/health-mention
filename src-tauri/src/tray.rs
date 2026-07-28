@@ -20,6 +20,11 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
     let show = MenuItemBuilder::with_id("show", "打开设置").build(app)?;
     let break_now = MenuItemBuilder::with_id("break_now", "立即休息").build(app)?;
+    // 结束休息：仅休息会话进行中可用
+    let end_break = MenuItemBuilder::with_id("end_break", "结束休息")
+        .enabled(false)
+        .build(app)?;
+    *app.state::<AppState>().end_item.lock().unwrap() = Some(end_break.clone());
     let pause = CheckMenuItemBuilder::with_id("toggle_pause", "暂停提醒")
         .checked(paused)
         .build(app)?;
@@ -34,6 +39,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &show,
             &break_now,
+            &end_break,
             &pause,
             &PredefinedMenuItem::separator(app)?,
             &MenuItemBuilder::with_id("quit", "退出").build(app)?,
@@ -46,6 +52,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main_window(app),
             "break_now" => session::start_session(app, "manual"),
+            "end_break" => session::end_session(app, "stopped"),
             "toggle_pause" => toggle_pause(app),
             "quit" => app.exit(0),
             _ => {}
@@ -65,6 +72,13 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     }
     builder.build(app)?;
     Ok(())
+}
+
+/// 会话开始/结束时同步「结束休息」菜单项的可用状态
+pub fn set_end_enabled(app: &AppHandle, enabled: bool) {
+    if let Some(item) = app.state::<AppState>().end_item.lock().unwrap().as_ref() {
+        let _ = item.set_enabled(enabled);
+    };
 }
 
 /// 刷新托盘菜单顶部的统计文本

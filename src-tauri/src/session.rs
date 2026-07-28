@@ -50,6 +50,13 @@ pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
     })
 }
 
+/// overlay 前端首帧绘制完成后的回调：此时才显示窗口，消除白闪。
+pub fn overlay_ready(app: &AppHandle, label: &str) {
+    if let Some(win) = app.get_webview_window(label) {
+        let _ = win.show();
+    }
+}
+
 /// 设置页「预览休息浮窗」开关：展示/隐藏静态预览窗（无会话）。
 pub fn set_preview(app: &AppHandle, open: bool) {
     *app.state::<AppState>().overlay_preview.lock().unwrap() = open;
@@ -94,6 +101,7 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
     };
 
     show_overlays(app, &mode);
+    tray::set_end_enabled(app, true);
     let _ = app.emit(
         "break://start",
         BreakStartPayload {
@@ -112,7 +120,8 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
             matches!(session.as_ref(), Some(s) if s.seq == seq)
         };
         if still_active {
-            end_session(&app_clone, "done");
+            let h = app_clone.clone();
+            let _ = app_clone.run_on_main_thread(move || end_session(&h, "done"));
         }
     });
 }
@@ -135,6 +144,7 @@ pub fn end_session(app: &AppHandle, result: &str) {
     }
 
     hide_overlays(app);
+    tray::set_end_enabled(app, false);
     let _ = app.emit(
         "break://end",
         BreakEndPayload {
@@ -149,6 +159,7 @@ pub fn end_session(app: &AppHandle, result: &str) {
 
 /// 每个显示器各创建一个 overlay 窗口：优先使用记忆的位置与宽高，
 /// 否则初始同尺寸、各自居中。先销毁已有窗口保证状态干净。
+/// 窗口初始隐藏，前端首帧绘制完成后经 overlay_ready 显示（消除白闪）。
 fn show_overlays(app: &AppHandle, mode: &str) {
     hide_overlays(app);
     let monitors = app.available_monitors().unwrap_or_default();
@@ -182,7 +193,8 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         .resizable(false)
         // 出现时不夺取输入焦点，避免打断用户打字
         .focused(false)
-        .visible(true);
+        // 先隐藏，overlay_ready 后再显示，消除白闪
+        .visible(false);
     if mode == "fullscreen" {
         builder = builder.fullscreen(true);
     } else if let Some(r) = saved {

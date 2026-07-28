@@ -29,6 +29,8 @@ pub struct AppState {
     pub session_seq: Mutex<u64>,
     /// 托盘「暂停提醒」勾选框句柄，用于快捷键切换时同步勾选状态
     pub pause_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
+    /// 托盘「结束休息」菜单项句柄，随会话状态启用/禁用
+    pub end_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     /// 托盘菜单顶部的倒计时/统计文本项
     pub info_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     pub stats_item: Mutex<Option<MenuItem<tauri::Wry>>>,
@@ -106,6 +108,12 @@ fn end_break(app: tauri::AppHandle) {
 #[tauri::command]
 fn get_break_state(app: tauri::AppHandle) -> Option<BreakStatePayload> {
     session::get_break_state(&app)
+}
+
+#[tauri::command]
+fn overlay_ready(app: tauri::AppHandle, label: String) {
+    let h = app.clone();
+    let _ = app.run_on_main_thread(move || session::overlay_ready(&h, &label));
 }
 
 #[tauri::command]
@@ -253,6 +261,7 @@ fn main() {
                 session: Mutex::new(None),
                 session_seq: Mutex::new(0),
                 pause_item: Mutex::new(None),
+                end_item: Mutex::new(None),
                 info_item: Mutex::new(None),
                 stats_item: Mutex::new(None),
                 overlay_preview: Mutex::new(false),
@@ -348,6 +357,7 @@ fn main() {
             trigger_break,
             end_break,
             get_break_state,
+            overlay_ready,
             get_schedule_state,
             list_logs,
             get_stats,

@@ -39,6 +39,13 @@ if (!state && !preview) {
     // 预览：静态半条
     bar.style.width = "50%";
   }
+
+  // 首帧绘制完成后通知后端显示窗口（窗口先隐藏建出，避免白闪）
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      invoke("overlay_ready", { label: win.label }).catch(() => {});
+    });
+  });
 }
 
 function startCountdown(state: BreakState): void {
