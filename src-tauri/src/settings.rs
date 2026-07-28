@@ -5,8 +5,10 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BreakSettings {
-    pub interval_min: u32,
-    pub duration_sec: u32,
+    /// 间隔分钟，支持小数（如 0.5 = 30 秒）
+    pub interval_min: f64,
+    /// 休息时长秒，支持小数
+    pub duration_sec: f64,
     pub enabled: bool,
 }
 
@@ -44,8 +46,8 @@ impl Default for Settings {
         Self {
             version: 1,
             break_: BreakSettings {
-                interval_min: 30,
-                duration_sec: 60,
+                interval_min: 30.0,
+                duration_sec: 60.0,
                 enabled: true,
             },
             hotkeys: Hotkeys {
@@ -66,11 +68,12 @@ impl Default for Settings {
 
 impl Settings {
     pub fn validate(&self) -> Result<(), String> {
-        if !(1..=1440).contains(&self.break_.interval_min) {
-            return Err("间隔分钟需在 1~1440 之间".into());
+        // NaN 比较恒为 false，会自然落入错误分支
+        if !(self.break_.interval_min > 0.0 && self.break_.interval_min <= 1440.0) {
+            return Err("间隔分钟需在 0~1440 之间（不含 0）".into());
         }
-        if !(5..=3600).contains(&self.break_.duration_sec) {
-            return Err("休息时长需在 5~3600 秒之间".into());
+        if !(self.break_.duration_sec > 0.0 && self.break_.duration_sec <= 3600.0) {
+            return Err("休息时长需在 0~3600 秒之间（不含 0）".into());
         }
         if !matches!(self.global.overlay_mode.as_str(), "float" | "fullscreen") {
             return Err("overlayMode 只能是 float 或 fullscreen".into());

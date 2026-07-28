@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// 进行中的休息会话。
 pub struct ActiveSession {
     pub seq: u64,
-    pub planned_sec: u64,
+    pub planned_sec: f64,
     pub started: Instant,
     pub trigger: String,
 }
@@ -14,7 +14,7 @@ pub struct ActiveSession {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BreakStartPayload {
-    pub planned_sec: u64,
+    pub planned_sec: f64,
     pub trigger: String,
 }
 
@@ -29,8 +29,8 @@ pub struct BreakEndPayload {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BreakStatePayload {
-    pub planned_sec: u64,
-    pub elapsed_sec: u64,
+    pub planned_sec: f64,
+    pub elapsed_sec: f64,
 }
 
 pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
@@ -41,7 +41,7 @@ pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
         .as_ref()
         .map(|s| BreakStatePayload {
             planned_sec: s.planned_sec,
-            elapsed_sec: s.started.elapsed().as_secs(),
+            elapsed_sec: s.started.elapsed().as_secs_f64(),
         })
 }
 
@@ -54,7 +54,7 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
             return;
         }
         let settings = state.settings.lock().unwrap();
-        let planned = settings.break_.duration_sec as u64;
+        let planned = settings.break_.duration_sec;
         let mode = settings.global.overlay_mode.clone();
         let mut seq_guard = state.session_seq.lock().unwrap();
         *seq_guard += 1;
@@ -80,7 +80,7 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
     // 倒计时归零自动结束（done）。提前结束时 seq 对应会话已被取走，此处自然失效。
     let app_clone = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(planned_sec));
+        std::thread::sleep(Duration::from_secs_f64(planned_sec));
         let still_active = {
             let session = app_clone.state::<AppState>().session.lock().unwrap();
             matches!(session.as_ref(), Some(s) if s.seq == seq)
@@ -101,7 +101,7 @@ pub fn end_session(app: &AppHandle, result: &str) {
         ts: chrono::Local::now().to_rfc3339(),
         trigger: s.trigger.clone(),
         planned_sec: s.planned_sec,
-        actual_sec: s.started.elapsed().as_secs(),
+        actual_sec: s.started.elapsed().as_secs_f64(),
         result: result.to_string(),
     };
     if let Err(e) = storage::append_log(&state.logs_dir, &record) {

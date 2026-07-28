@@ -17,7 +17,7 @@ impl Scheduler {
 
     pub fn reload(&mut self, settings: &Settings) {
         self.next_due = if settings.break_.enabled && !settings.global.paused {
-            Some(Instant::now() + Duration::from_secs(settings.break_.interval_min as u64 * 60))
+            Some(Instant::now() + Duration::from_secs_f64(settings.break_.interval_min * 60.0))
         } else {
             None
         };

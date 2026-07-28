@@ -8,8 +8,8 @@ use std::path::Path;
 pub struct LogRecord {
     pub ts: String,
     pub trigger: String,
-    pub planned_sec: u64,
-    pub actual_sec: u64,
+    pub planned_sec: f64,
+    pub actual_sec: f64,
     pub result: String,
 }
 
