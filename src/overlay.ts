@@ -139,7 +139,8 @@ function setupDragAndResize(): void {
     const onMove = (ev: MouseEvent) => {
       if (!startW) return;
       const w = Math.max(60, startW + (ev.screenX - startX));
-      const h = Math.max(12, startH + (ev.screenY - startY));
+      // Windows 最小跟踪高度约 39，再小系统会夹紧
+      const h = Math.max(39, startH + (ev.screenY - startY));
       win.setSize(new LogicalSize(w, h)).catch(console.error);
     };
     const onUp = () => {

@@ -4,7 +4,8 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const FLOAT_W: f64 = 320.0;
-const FLOAT_H: f64 = 32.0;
+// 高度默认值取 Windows 最小跟踪尺寸（SM_CYMINTRACK ≈ 39），再小会被系统夹紧
+const FLOAT_H: f64 = 39.0;
 
 /// 进行中的休息会话。
 pub struct ActiveSession {
@@ -186,8 +187,9 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         .resizable(false)
         // 去掉 DWM 阴影/描边，小尺寸下不露出半透明底盘
         .shadow(false)
-        // 与前端拖拽最小值一致，防止窗口与 webview 尺寸脱节
-        .min_inner_size(60.0, 12.0)
+        // 与前端拖拽最小值一致，防止窗口与 webview 尺寸脱节；
+        // 高度 39 为 Windows 最小跟踪尺寸（SM_CYMINTRACK），系统不允许更小
+        .min_inner_size(60.0, 39.0)
         // 出现时不夺取输入焦点，避免打断用户打字
         .focused(false)
         // WebView 背景色与页面底色一致，杜绝首帧白闪

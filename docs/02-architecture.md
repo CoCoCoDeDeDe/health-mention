@@ -51,7 +51,7 @@
   - 浮窗：左键拖拽移动（位移超 4px 才 `startDragging`，不吞双击）、右下角手柄调整宽高（`setSize`，最小 120×28）
   - **双击进度条 = 提前结束**；Alt+F4 关闭任一 overlay 也视为提前结束
   - 各窗口移动/调整各自独立，不同步
-- 建窗 `focused(false)` + `focusable(false)`：不夺取输入焦点
+- 建窗 `focused(false)` + `shadow(false)` + `resizable(false)`（防贴靠吸附）+ `min_inner_size(60, 39)`；**高度下限 39 是 Windows 最小跟踪尺寸（SM_CYMINTRACK）的硬约束，无法更小**（透明窗口方案因挡点击与闪白风险弃用）
 - 位置/宽高记忆：各窗口前端每 2s 上报 rect（`save_overlay_rect`，仅变化时写 `overlay-rects.json`），overlay 建窗与 main 窗口启动时优先使用
 - 手动休息（trigger=manual）：到点不自动结束，前端转正计时显示累计时长（分母 1h/1d/7d）；用户结束时实际满计划记 done 否则 stopped。定时休息到点自动 done
 - 白闪治理：建窗 `visible(false)` + 前端首帧后 `overlay_ready` 再显示 + WebView `background_color` 与页面底色一致
