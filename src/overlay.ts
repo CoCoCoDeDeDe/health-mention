@@ -5,23 +5,22 @@ interface BreakState {
   plannedSec: number;
   elapsedSec: number;
   mode: string;
+  trigger: string;
 }
 
 const win = getCurrentWindow();
 const track = document.getElementById("bar-track") as HTMLDivElement;
 const bar = document.getElementById("bar") as HTMLDivElement;
 const grip = document.getElementById("grip") as HTMLDivElement;
+const otText = document.getElementById("ot-text") as HTMLSpanElement;
 
 const state = await invoke<BreakState | null>("get_break_state");
-const preview = state ? false : await invoke<boolean>("get_overlay_preview").catch(() => false);
 
-if (!state && !preview) {
-  // 无会话且非预览（如会话已结束窗口残留），直接关闭
+if (!state) {
+  // 无会话（如会话已结束窗口残留），直接关闭
   await win.close();
 } else {
-  const mode = state?.mode ?? "float";
-
-  if (mode === "fullscreen") {
+  if (state.mode === "fullscreen") {
     document.body.classList.add("fullscreen");
   } else {
     grip.classList.remove("hidden");
@@ -29,15 +28,15 @@ if (!state && !preview) {
     setupRectPersistence();
   }
 
-  if (state) {
-    // 双击 = 提前结束（拖拽已加位移阈值，不与双击冲突）
-    document.body.addEventListener("dblclick", () => {
-      invoke("end_break").catch(console.error);
-    });
-    startCountdown(state);
+  // 双击 = 提前结束（拖拽已加位移阈值，不与双击冲突）
+  document.body.addEventListener("dblclick", () => {
+    invoke("end_break").catch(console.error);
+  });
+
+  if (state.trigger === "manual") {
+    runManual(state);
   } else {
-    // 预览：静态半条
-    bar.style.width = "50%";
+    runScheduled(state);
   }
 
   // 首帧绘制完成后通知后端显示窗口（窗口先隐藏建出，避免白闪）
@@ -48,8 +47,8 @@ if (!state && !preview) {
   });
 }
 
-function startCountdown(state: BreakState): void {
-  // 以后端状态推算本地截止时刻，前端独立倒计时渲染
+/** 定时休息：倒计时跑完由后端自动结束 */
+function runScheduled(state: BreakState): void {
   const endAt = Date.now() + (state.plannedSec - state.elapsedSec) * 1000;
   const update = () => {
     const remainingMs = Math.max(0, endAt - Date.now());
@@ -59,6 +58,45 @@ function startCountdown(state: BreakState): void {
   };
   const timer = setInterval(update, 200);
   update();
+}
+
+/** 手动休息：先倒计时跑完计划时长，再转为正计时（不自动退出），
+ *  中央显示累计休息时长；分母随量级切换（1 小时 / 1 天 / 7 天） */
+function runManual(state: BreakState): void {
+  const startStamp = Date.now() - state.elapsedSec * 1000;
+  const plannedMs = state.plannedSec * 1000;
+  const update = () => {
+    const elapsedMs = Date.now() - startStamp;
+    if (elapsedMs < plannedMs) {
+      bar.style.width = `${((elapsedMs / plannedMs) * 100).toFixed(1)}%`;
+      otText.classList.add("hidden");
+      return;
+    }
+    const elapsed = elapsedMs / 1000;
+    otText.classList.remove("hidden");
+    otText.textContent = fmtElapsed(elapsed);
+    bar.style.width = `${(Math.min(1, elapsed / denominator(elapsed)) * 100).toFixed(1)}%`;
+  };
+  const timer = setInterval(update, 250);
+  update();
+  void timer;
+}
+
+function denominator(sec: number): number {
+  if (sec < 3600) return 3600; // 分母 1 小时
+  if (sec < 86400) return 86400; // 分母 1 天
+  return 604800; // 分母 7 天
+}
+
+function fmtElapsed(sec: number): string {
+  const t = Math.floor(sec);
+  const d = Math.floor(t / 86400);
+  const h = Math.floor((t % 86400) / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  if (d > 0) return `已休息 ${d} 天 ${h} 小时`;
+  if (h > 0) return `已休息 ${h} 小时 ${m} 分`;
+  return `已休息 ${m} 分 ${s} 秒`;
 }
 
 function setupDragAndResize(): void {
@@ -100,8 +138,8 @@ function setupDragAndResize(): void {
       .catch(console.error);
     const onMove = (ev: MouseEvent) => {
       if (!startW) return;
-      const w = Math.max(120, startW + (ev.screenX - startX));
-      const h = Math.max(28, startH + (ev.screenY - startY));
+      const w = Math.max(60, startW + (ev.screenX - startX));
+      const h = Math.max(12, startH + (ev.screenY - startY));
       win.setSize(new LogicalSize(w, h)).catch(console.error);
     };
     const onUp = () => {

@@ -34,8 +34,6 @@ pub struct AppState {
     /// 托盘菜单顶部的倒计时/统计文本项
     pub info_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     pub stats_item: Mutex<Option<MenuItem<tauri::Wry>>>,
-    /// 设置页「预览休息浮窗」开关状态
-    pub overlay_preview: Mutex<bool>,
     /// 各窗口记忆的位置与宽高（按窗口标签，含 main）
     pub overlay_rects: Mutex<HashMap<String, storage::OverlayRect>>,
     pub rects_path: PathBuf,
@@ -157,17 +155,6 @@ fn save_overlay_rect(
     storage::save_overlay_rects(&state.rects_path, &rects)
 }
 
-#[tauri::command]
-fn set_overlay_preview(app: tauri::AppHandle, open: bool) {
-    let h = app.clone();
-    let _ = app.run_on_main_thread(move || session::set_preview(&h, open));
-}
-
-#[tauri::command]
-fn get_overlay_preview(state: State<AppState>) -> bool {
-    *state.overlay_preview.lock().unwrap()
-}
-
 /// 计算当前调度状态（下一次休息倒计时）。
 fn schedule_state(state: &AppState, in_session: bool) -> ScheduleTickPayload {
     let settings = state.settings.lock().unwrap();
@@ -264,7 +251,6 @@ fn main() {
                 end_item: Mutex::new(None),
                 info_item: Mutex::new(None),
                 stats_item: Mutex::new(None),
-                overlay_preview: Mutex::new(false),
                 overlay_rects: Mutex::new(storage::load_overlay_rects(&rects_path)),
                 rects_path,
             });
@@ -362,9 +348,7 @@ fn main() {
             list_logs,
             get_stats,
             clear_logs,
-            save_overlay_rect,
-            set_overlay_preview,
-            get_overlay_preview
+            save_overlay_rect
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

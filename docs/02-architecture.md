@@ -53,7 +53,8 @@
   - 各窗口移动/调整各自独立，不同步
 - 建窗 `focused(false)` + `focusable(false)`：不夺取输入焦点
 - 位置/宽高记忆：各窗口前端每 2s 上报 rect（`save_overlay_rect`，仅变化时写 `overlay-rects.json`），overlay 建窗与 main 窗口启动时优先使用
-- 预览：设置页「预览休息浮窗」开关（`set/get_overlay_preview`），无会话时 overlay 显示静态半条用于调整；会话开始时自动关闭预览并重建窗口
+- 手动休息（trigger=manual）：到点不自动结束，前端转正计时显示累计时长（分母 1h/1d/7d）；用户结束时实际满计划记 done 否则 stopped。定时休息到点自动 done
+- 白闪治理：建窗 `visible(false)` + 前端首帧后 `overlay_ready` 再显示 + WebView `background_color` 与页面底色一致
 - 注：建窗只用 `focused(false)`；`focusable(false)` 在 Windows 上会导致窗口白屏卡死，勿用
 - capabilities 用 `overlay-*` 匹配动态窗口标签，附加 `start-dragging` / `set-size` / `close` 权限
 

@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const FLOAT_W: f64 = 320.0;
-const FLOAT_H: f64 = 44.0;
+const FLOAT_H: f64 = 32.0;
 
 /// 进行中的休息会话。
 pub struct ActiveSession {
@@ -35,6 +35,7 @@ pub struct BreakStatePayload {
     pub planned_sec: f64,
     pub elapsed_sec: f64,
     pub mode: String,
+    pub trigger: String,
 }
 
 pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
@@ -46,6 +47,7 @@ pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
             planned_sec: s.planned_sec,
             elapsed_sec: s.started.elapsed().as_secs_f64(),
             mode,
+            trigger: s.trigger.clone(),
         }
     })
 }
@@ -54,24 +56,6 @@ pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
 pub fn overlay_ready(app: &AppHandle, label: &str) {
     if let Some(win) = app.get_webview_window(label) {
         let _ = win.show();
-    }
-}
-
-/// 设置页「预览休息浮窗」开关：展示/隐藏静态预览窗（无会话）。
-pub fn set_preview(app: &AppHandle, open: bool) {
-    *app.state::<AppState>().overlay_preview.lock().unwrap() = open;
-    if open {
-        let mode = app
-            .state::<AppState>()
-            .settings
-            .lock()
-            .unwrap()
-            .global
-            .overlay_mode
-            .clone();
-        show_overlays(app, &mode);
-    } else {
-        hide_overlays(app);
     }
 }
 
@@ -95,8 +79,6 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
             started: Instant::now(),
             trigger: trigger.to_string(),
         });
-        // 预览若开着，随真实会话关闭（窗口会重建为真实倒计时）
-        *state.overlay_preview.lock().unwrap() = false;
         (seq, planned, mode)
     };
 
@@ -110,16 +92,19 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
         },
     );
 
-    // 倒计时归零自动结束（done）。提前结束时 seq 对应会话已被取走，此处自然失效。
+    // 到点后的处理：定时休息自动结束（done）；手动休息不自动退出（前端转正计时）。
     let app_clone = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs_f64(planned_sec));
-        let still_active = {
+        let trigger = {
             let state = app_clone.state::<AppState>();
             let session = state.session.lock().unwrap();
-            matches!(session.as_ref(), Some(s) if s.seq == seq)
+            match session.as_ref() {
+                Some(s) if s.seq == seq => Some(s.trigger.clone()),
+                _ => None,
+            }
         };
-        if still_active {
+        if matches!(trigger.as_deref(), Some("scheduled")) {
             let h = app_clone.clone();
             let _ = app_clone.run_on_main_thread(move || end_session(&h, "done"));
         }
@@ -127,16 +112,24 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
 }
 
 /// 结束当前会话：写记录、销毁所有 overlay、重置计时器、刷新托盘统计。
+/// 手动休息且实际时长已满计划时长时，用户主动结束记为 done（完成）。
 pub fn end_session(app: &AppHandle, result: &str) {
     let state = app.state::<AppState>();
     let session = state.session.lock().unwrap().take();
     let Some(s) = session else { return };
 
+    let actual_sec = s.started.elapsed().as_secs_f64();
+    let result = if s.trigger == "manual" && actual_sec >= s.planned_sec {
+        "done"
+    } else {
+        result
+    };
+
     let record = storage::LogRecord {
         ts: chrono::Local::now().to_rfc3339(),
         trigger: s.trigger.clone(),
         planned_sec: s.planned_sec,
-        actual_sec: s.started.elapsed().as_secs_f64(),
+        actual_sec,
         result: result.to_string(),
     };
     if let Err(e) = storage::append_log(&state.logs_dir, &record) {
@@ -193,6 +186,8 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         .resizable(false)
         // 出现时不夺取输入焦点，避免打断用户打字
         .focused(false)
+        // WebView 背景色与页面底色一致，杜绝首帧白闪
+        .background_color(tauri::utils::config::Color(46, 58, 48, 255))
         // 先隐藏，overlay_ready 后再显示，消除白闪
         .visible(false);
     if mode == "fullscreen" {

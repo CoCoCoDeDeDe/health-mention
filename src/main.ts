@@ -202,16 +202,6 @@ async function pollSchedule(): Promise<void> {
 setInterval(pollSchedule, 1000);
 pollSchedule();
 
-// ---- overlay preview ----
-
-const previewBox = el<HTMLInputElement>("overlay-preview");
-invoke<boolean>("get_overlay_preview")
-  .then((v) => (previewBox.checked = v))
-  .catch(console.error);
-previewBox.addEventListener("change", () => {
-  invoke("set_overlay_preview", { open: previewBox.checked }).catch(console.error);
-});
-
 // ---- persist main window rect ----
 
 const mainWin = getCurrentWindow();
