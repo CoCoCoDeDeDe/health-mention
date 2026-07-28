@@ -178,7 +178,8 @@ fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&taur
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .resizable(true)
+        // 禁用系统缩放边框，避免 Windows 11 贴靠布局吸附；宽高由前端 setSize 程序化调整
+        .resizable(false)
         // 出现时不夺取输入焦点，避免打断用户打字
         .focused(false)
         .visible(true);

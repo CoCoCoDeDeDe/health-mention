@@ -87,14 +87,18 @@ fn save_settings(
     Ok(())
 }
 
+// 注意：所有涉及窗口操作的命令/回调一律经 run_on_main_thread 收敛到主线程。
+// 后台线程直接操作窗口会走 wry 的 PostMessage 派发，曾导致主循环阻塞、
+// 窗口白屏卡死（队列塞满后 PostMessage failed）。
+
 #[tauri::command]
 fn trigger_break(app: tauri::AppHandle) {
-    session::start_session(&app, "manual");
+    let _ = app.run_on_main_thread(move || session::start_session(&app, "manual"));
 }
 
 #[tauri::command]
 fn end_break(app: tauri::AppHandle) {
-    session::end_session(&app, "stopped");
+    let _ = app.run_on_main_thread(move || session::end_session(&app, "stopped"));
 }
 
 #[tauri::command]
@@ -134,7 +138,7 @@ fn save_overlay_rect(
 
 #[tauri::command]
 fn set_overlay_preview(app: tauri::AppHandle, open: bool) {
-    session::set_preview(&app, open);
+    let _ = app.run_on_main_thread(move || session::set_preview(&app, open));
 }
 
 #[tauri::command]
@@ -173,7 +177,7 @@ fn schedule_state(state: &AppState, in_session: bool) -> ScheduleTickPayload {
     }
 }
 
-/// 每秒更新托盘 tooltip 与菜单顶部的倒计时文本。
+/// 更新托盘 tooltip 与菜单顶部的倒计时文本。须在主线程调用。
 fn update_tray_tooltip(handle: &tauri::AppHandle, in_session: bool) {
     let payload = schedule_state(&handle.state::<AppState>(), in_session);
     let menu_text = match payload.remaining_sec {
@@ -195,7 +199,7 @@ fn update_tray_tooltip(handle: &tauri::AppHandle, in_session: bool) {
         .as_ref()
     {
         let _ = item.set_text(&menu_text);
-    }
+    };
 }
 
 fn main() {
@@ -211,7 +215,12 @@ fn main() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
                     if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        hotkey::handle_shortcut(app, shortcut);
+                        // global-hotkey 在独立线程回调，窗口操作收敛到主线程
+                        let app = app.clone();
+                        let shortcut = shortcut.clone();
+                        let _ = app.run_on_main_thread(move || {
+                            hotkey::handle_shortcut(&app, &shortcut);
+                        });
                     }
                 })
                 .build(),
@@ -266,25 +275,32 @@ fn main() {
                 eprintln!("apply hotkeys failed: {e}");
             }
 
-            // 调度器 tick：每秒检查到期 + 更新托盘信息；每 60s 刷新统计文本
+            // 调度器 tick：每秒检查到期；窗口操作经 run_on_main_thread 收敛到主线程
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let mut ticks = 0u64;
                 loop {
                     std::thread::sleep(Duration::from_secs(1));
                     ticks += 1;
-                    let state = handle.state::<AppState>();
-                    let in_session = state.session.lock().unwrap().is_some();
-                    let due = state.scheduler.lock().unwrap().is_due();
-                    // 会话进行中到期无需处理：会话结束时会 reload 重新计时
-                    if due && !in_session {
-                        session::start_session(&handle, "scheduled");
-                    } else {
-                        update_tray_tooltip(&handle, in_session);
-                    }
-                    if ticks % 60 == 1 {
-                        tray::update_stats_item(&handle);
-                    }
+                    let (in_session, due) = {
+                        let state = handle.state::<AppState>();
+                        let in_session = state.session.lock().unwrap().is_some();
+                        let due = state.scheduler.lock().unwrap().is_due();
+                        (in_session, due)
+                    };
+                    let refresh_stats = ticks % 60 == 1;
+                    let h = handle.clone();
+                    let _ = handle.run_on_main_thread(move || {
+                        // 会话进行中到期无需处理：会话结束时会 reload 重新计时
+                        if due && !in_session {
+                            session::start_session(&h, "scheduled");
+                        } else {
+                            update_tray_tooltip(&h, in_session);
+                        }
+                        if refresh_stats {
+                            tray::update_stats_item(&h);
+                        }
+                    });
                 }
             });
 
