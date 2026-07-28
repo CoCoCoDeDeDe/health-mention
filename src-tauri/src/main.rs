@@ -123,6 +123,16 @@ fn get_stats(state: State<AppState>) -> stats::Stats {
 }
 
 #[tauri::command]
+fn clear_logs(app: tauri::AppHandle) -> Result<(), String> {
+    {
+        let state = app.state::<AppState>();
+        stats::clear_logs(&state.logs_dir)?;
+    }
+    let _ = app.run_on_main_thread(move || tray::update_stats_item(&app));
+    Ok(())
+}
+
+#[tauri::command]
 fn save_overlay_rect(
     state: State<AppState>,
     label: String,
@@ -337,6 +347,7 @@ fn main() {
             get_schedule_state,
             list_logs,
             get_stats,
+            clear_logs,
             save_overlay_rect,
             set_overlay_preview,
             get_overlay_preview

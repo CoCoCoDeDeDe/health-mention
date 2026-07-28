@@ -266,3 +266,24 @@ async function loadLogs(): Promise<void> {
 
 el<HTMLInputElement>("log-date").value = currentDate();
 el("log-date").addEventListener("change", () => loadLogs().catch(console.error));
+
+// ---- clear logs (two-step confirm) ----
+
+const clearBtn = el<HTMLButtonElement>("clear-logs-btn");
+let clearArmed = false;
+clearBtn.addEventListener("click", () => {
+  if (!clearArmed) {
+    clearArmed = true;
+    clearBtn.textContent = "确认清空？再点一次";
+    setTimeout(() => {
+      clearArmed = false;
+      clearBtn.textContent = "清空历史";
+    }, 3000);
+    return;
+  }
+  clearArmed = false;
+  clearBtn.textContent = "清空历史";
+  invoke("clear_logs")
+    .then(() => loadLogs())
+    .catch((e) => console.error(e));
+});

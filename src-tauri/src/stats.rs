@@ -36,8 +36,7 @@ pub struct Stats {
 
 /// 统计：今日完成次数（done 记录数）、连续坚持天数。
 /// 连续天数口径：今天尚无 done 时从昨天往前数（今天仍有机会，不算断）。
-pub fn get_stats(logs_dir: &Path) -> Stats {
-    let mut done_by_day: HashMap<chrono::NaiveDate, u32> = HashMap::new();
+pub fn get_stats(logs_dir: &Path) -> Stats {    let mut done_by_day: HashMap<chrono::NaiveDate, u32> = HashMap::new();
     if let Ok(entries) = fs::read_dir(logs_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -80,4 +79,17 @@ pub fn get_stats(logs_dir: &Path) -> Stats {
         today_done,
         streak_days,
     }
+}
+
+/// 清空全部休息记录（删除 logs 目录下所有 jsonl 文件）
+pub fn clear_logs(logs_dir: &Path) -> Result<(), String> {
+    if let Ok(entries) = fs::read_dir(logs_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                fs::remove_file(&path).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    Ok(())
 }

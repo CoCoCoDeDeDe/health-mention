@@ -163,6 +163,25 @@ button.primary:hover {
   border-bottom: none;
 }
 
+.log-actions {
+  margin-top: 10px;
+}
+
+button.danger {
+  padding: 5px 16px;
+  border: 1px solid #c98a8a;
+  border-radius: 8px;
+  background: transparent;
+  color: #b06060;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button.danger:hover {
+  background: #c98a8a;
+  color: #fff;
+}
+
 .hidden {
   display: none;
 }
