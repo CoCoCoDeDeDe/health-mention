@@ -1,3 +1,6 @@
+// 发布版不显示控制台窗口（debug 保留 console 便于查看日志）
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod hotkey;
 mod scheduler;
 mod session;
