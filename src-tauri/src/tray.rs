@@ -15,6 +15,8 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let pause = CheckMenuItemBuilder::with_id("toggle_pause", "暂停提醒")
         .checked(paused)
         .build(app)?;
+    // 保存句柄：快捷键切换暂停时同步菜单勾选状态
+    *app.state::<AppState>().pause_item.lock().unwrap() = Some(pause.clone());
     let sep = PredefinedMenuItem::separator(app)?;
     let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
     let menu = Menu::with_items(app, &[&show, &break_now, &pause, &sep, &quit])?;
@@ -43,13 +45,16 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
-fn toggle_pause(app: &AppHandle) {
+pub fn toggle_pause(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let settings = {
+    let (settings, paused) = {
         let mut settings_guard = state.settings.lock().unwrap();
         settings_guard.global.paused = !settings_guard.global.paused;
         let _ = settings::save(&state.settings_path, &settings_guard);
-        settings_guard.clone()
+        (settings_guard.clone(), settings_guard.global.paused)
     };
+    if let Some(item) = state.pause_item.lock().unwrap().as_ref() {
+        let _ = item.set_checked(paused);
+    }
     state.scheduler.lock().unwrap().reload(&settings);
 }

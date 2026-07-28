@@ -1,6 +1,8 @@
+mod hotkey;
 mod scheduler;
 mod session;
 mod settings;
+mod stats;
 mod storage;
 mod tray;
 
@@ -11,7 +13,7 @@ use settings::Settings;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{Manager, State};
+use tauri::{menu::CheckMenuItem, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 pub struct AppState {
@@ -21,6 +23,8 @@ pub struct AppState {
     pub scheduler: Mutex<Scheduler>,
     pub session: Mutex<Option<ActiveSession>>,
     pub session_seq: Mutex<u64>,
+    /// 托盘「暂停提醒」勾选框句柄，用于快捷键切换时同步勾选状态
+    pub pause_item: Mutex<Option<CheckMenuItem>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -65,6 +69,8 @@ fn save_settings(
     }
 
     state.scheduler.lock().unwrap().reload(&settings);
+    // 快捷键全量重注册；失败（被占用/格式错）返回错误提示用户
+    hotkey::apply_hotkeys(&app, &settings.hotkeys)?;
     *state.settings.lock().unwrap() = settings;
     Ok(())
 }
@@ -88,6 +94,16 @@ fn get_break_state(app: tauri::AppHandle) -> Option<BreakStatePayload> {
 fn get_schedule_state(state: State<AppState>) -> ScheduleTickPayload {
     let in_session = state.session.lock().unwrap().is_some();
     schedule_state(&state, in_session)
+}
+
+#[tauri::command]
+fn list_logs(state: State<AppState>, month: Option<String>) -> Result<Vec<storage::LogRecord>, String> {
+    stats::list_logs(&state.logs_dir, month)
+}
+
+#[tauri::command]
+fn get_stats(state: State<AppState>) -> stats::Stats {
+    stats::get_stats(&state.logs_dir)
 }
 
 /// 计算当前调度状态（下一次休息倒计时）。
@@ -146,6 +162,15 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        hotkey::handle_shortcut(app, shortcut);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("app data dir unavailable");
             std::fs::create_dir_all(&dir).ok();
@@ -158,8 +183,21 @@ fn main() {
                 logs_dir: dir.join("logs"),
                 session: Mutex::new(None),
                 session_seq: Mutex::new(0),
+                pause_item: Mutex::new(None),
             });
             tray::setup_tray(&app.handle())?;
+
+            // 启动时按配置注册全局快捷键
+            let hotkeys = app
+                .state::<AppState>()
+                .settings
+                .lock()
+                .unwrap()
+                .hotkeys
+                .clone();
+            if let Err(e) = hotkey::apply_hotkeys(&app.handle(), &hotkeys) {
+                eprintln!("apply hotkeys failed: {e}");
+            }
 
             // 调度器 tick：每秒检查到期 + 更新托盘 tooltip
             let handle = app.handle().clone();
@@ -196,7 +234,9 @@ fn main() {
             trigger_break,
             end_break,
             get_break_state,
-            get_schedule_state
+            get_schedule_state,
+            list_logs,
+            get_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

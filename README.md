@@ -32,7 +32,7 @@ WSL 提交并 push → Windows `git pull` → `npm run tauri dev`。
 ## 里程碑
 
 - [x] M1 脚手架：Tauri 工程、托盘、设置页读写 settings.json、自启动开关
-- [ ] M2 调度器 + overlay 默认进度条 + 休息记录落盘
+- [x] M2 调度器 + overlay 默认进度条 + 休息记录落盘
 - [ ] M3 记录列表 + 简单统计 + 手动休息 + 全局快捷键
 - [ ] M4 自定义进度组件加载 + 主题选择
 - [ ] M5 打包、打磨

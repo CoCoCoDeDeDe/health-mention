@@ -110,6 +110,59 @@ button.primary:hover {
   margin: 4px 0 0;
 }
 
+.hotkey-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hotkey-wrap input {
+  width: 160px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.hk-clear {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--fg-dim);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hk-clear:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
+.stats {
+  font-size: 15px;
+  margin: 4px 0;
+}
+
+.log-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.log-row {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.log-row:last-child {
+  border-bottom: none;
+}
+
 .hidden {
   display: none;
 }

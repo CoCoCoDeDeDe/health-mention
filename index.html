@@ -38,6 +38,32 @@
       </section>
 
       <section class="card">
+        <h2>全局快捷键</h2>
+        <label class="row">
+          <span>立即休息</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-break-now" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-break-now" title="清除">×</button>
+          </span>
+        </label>
+        <label class="row">
+          <span>暂停/恢复提醒</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-toggle-pause" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-toggle-pause" title="清除">×</button>
+          </span>
+        </label>
+        <label class="row">
+          <span>打开设置</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-open-settings" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-open-settings" title="清除">×</button>
+          </span>
+        </label>
+        <p class="hint">留空即关闭该快捷键；保存时生效，被占用会提示。</p>
+      </section>
+
+      <section class="card">
         <h2>系统</h2>
         <label class="row">
           <input type="checkbox" id="autostart" />
@@ -59,7 +85,6 @@
             <option value="">内置默认（M4 开放）</option>
           </select>
         </label>
-        <p class="hint">全局快捷键将在 M3 提供。</p>
       </section>
 
       <div class="actions">
@@ -69,7 +94,18 @@
     </main>
 
     <main id="tab-logs" class="tab-panel hidden">
-      <p class="hint">休息记录与统计将在 M3 提供。</p>
+      <section class="card">
+        <h2>统计</h2>
+        <p class="stats" id="stats-line">…</p>
+      </section>
+      <section class="card">
+        <h2>记录</h2>
+        <label class="row">
+          <span>月份</span>
+          <input type="month" id="log-month" />
+        </label>
+        <div id="log-list" class="log-list"></div>
+      </section>
     </main>
 
     <script type="module" src="/src/main.ts"></script>
