@@ -26,4 +26,9 @@ impl Scheduler {
     pub fn is_due(&self) -> bool {
         matches!(self.next_due, Some(t) if Instant::now() >= t)
     }
+
+    /// 距下一次休息的剩余时间；未启用/暂停时为 None
+    pub fn remaining(&self) -> Option<Duration> {
+        self.next_due.and_then(|t| t.checked_duration_since(Instant::now()))
+    }
 }

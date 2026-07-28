@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 interface BreakSettings {
   intervalMin: number;
@@ -25,6 +26,11 @@ interface Settings {
   break: BreakSettings;
   hotkeys: Hotkeys;
   global: GlobalSettings;
+}
+
+interface ScheduleTick {
+  remainingSec: number | null;
+  status: "running" | "paused" | "disabled" | "inSession";
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -95,3 +101,27 @@ el("save-btn").addEventListener("click", save);
 load().catch((e) => {
   el("save-status").textContent = `加载失败：${e}`;
 });
+
+// ---- next break countdown ----
+
+function fmtRemain(sec: number): string {
+  const total = Math.ceil(sec);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h} 小时 ${m} 分`;
+  if (m > 0) return `${m} 分 ${s} 秒`;
+  return `${s} 秒`;
+}
+
+listen<ScheduleTick>("schedule://tick", (e) => {
+  const { remainingSec, status } = e.payload;
+  el("next-break").textContent =
+    status === "running" && remainingSec != null
+      ? `距离下次休息：${fmtRemain(remainingSec)}`
+      : status === "paused"
+        ? "提醒已暂停"
+        : status === "disabled"
+          ? "提醒已禁用"
+          : "休息中…";
+}).catch(console.error);

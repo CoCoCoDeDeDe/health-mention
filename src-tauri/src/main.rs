@@ -5,12 +5,13 @@ mod storage;
 mod tray;
 
 use scheduler::Scheduler;
+use serde::Serialize;
 use session::{ActiveSession, BreakStatePayload};
 use settings::Settings;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 pub struct AppState {
@@ -20,6 +21,25 @@ pub struct AppState {
     pub scheduler: Mutex<Scheduler>,
     pub session: Mutex<Option<ActiveSession>>,
     pub session_seq: Mutex<u64>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ScheduleTickPayload {
+    remaining_sec: Option<f64>,
+    status: &'static str,
+}
+
+fn fmt_hms(secs: f64) -> String {
+    let total = secs.ceil() as u64;
+    let h = total / 3600;
+    let m = (total % 3600) / 60;
+    let s = total % 60;
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
 }
 
 #[tauri::command]
@@ -64,6 +84,51 @@ fn get_break_state(app: tauri::AppHandle) -> Option<BreakStatePayload> {
     session::get_break_state(&app)
 }
 
+/// 每秒：更新托盘 tooltip、广播 schedule://tick
+fn broadcast_schedule_tick(handle: &tauri::AppHandle, in_session: bool) {
+    let state = handle.state::<AppState>();
+    let (status, remaining_sec) = {
+        let settings = state.settings.lock().unwrap();
+        if in_session {
+            ("inSession", None)
+        } else if settings.global.paused {
+            ("paused", None)
+        } else if !settings.break_.enabled {
+            ("disabled", None)
+        } else {
+            (
+                "running",
+                state
+                    .scheduler
+                    .lock()
+                    .unwrap()
+                    .remaining()
+                    .map(|d| d.as_secs_f64()),
+            )
+        }
+    };
+
+    if let Some(tray) = handle.tray_by_id(tray::TRAY_ID) {
+        let tooltip = match remaining_sec {
+            Some(s) => format!("health-mention · {} 后休息", fmt_hms(s)),
+            None => match status {
+                "paused" => "health-mention · 已暂停".to_string(),
+                "disabled" => "health-mention · 提醒已禁用".to_string(),
+                _ => "health-mention · 休息中".to_string(),
+            },
+        };
+        let _ = tray.set_tooltip(Some(&tooltip));
+    }
+
+    let _ = handle.emit(
+        "schedule://tick",
+        ScheduleTickPayload {
+            remaining_sec,
+            status,
+        },
+    );
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -88,16 +153,18 @@ fn main() {
             });
             tray::setup_tray(&app.handle())?;
 
-            // 调度器 tick：每秒检查是否到期
+            // 调度器 tick：每秒检查到期 + 广播下一次休息倒计时
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(Duration::from_secs(1));
                 let state = handle.state::<AppState>();
-                let due = state.scheduler.lock().unwrap().is_due();
                 let in_session = state.session.lock().unwrap().is_some();
+                let due = state.scheduler.lock().unwrap().is_due();
                 // 会话进行中到期无需处理：会话结束时会 reload 重新计时
                 if due && !in_session {
                     session::start_session(&handle, "scheduled");
+                } else {
+                    broadcast_schedule_tick(&handle, in_session);
                 }
             });
 
