@@ -13,8 +13,10 @@ pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
     };
     if matches(&hotkeys.break_now) {
         session::start_session(app, "manual");
-    } else if matches(&hotkeys.toggle_pause) {
-        tray::toggle_pause(app);
+    } else if matches(&hotkeys.toggle_enabled) {
+        tray::toggle_enabled(app);
+    } else if matches(&hotkeys.end_break) {
+        session::end_session(app, "stopped");
     } else if matches(&hotkeys.open_settings) {
         tray::show_main_window(app);
     }
@@ -27,7 +29,8 @@ pub fn apply_hotkeys(app: &AppHandle, hotkeys: &Hotkeys) -> Result<(), String> {
     gs.unregister_all().map_err(|e| e.to_string())?;
     for (name, acc) in [
         ("立即休息", &hotkeys.break_now),
-        ("暂停/恢复提醒", &hotkeys.toggle_pause),
+        ("开关启用提醒", &hotkeys.toggle_enabled),
+        ("手动结束休息", &hotkeys.end_break),
         ("打开设置", &hotkeys.open_settings),
     ] {
         if let Some(acc) = acc {

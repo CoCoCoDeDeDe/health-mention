@@ -56,7 +56,7 @@
 ## 全局快捷键
 
 - 基于 `tauri-plugin-global-shortcut` 注册系统级快捷键
-- 三个可配置动作：`breakNow`（立即休息）、`togglePause`（暂停/恢复）、`openSettings`（打开设置）
+- 四个可配置动作：`breakNow`（立即休息）、`toggleEnabled`（开关启用提醒）、`endBreak`（手动结束休息）、`openSettings`（打开设置）
 - `settings.json` 中每个动作存 accelerator 字符串（如 `"Ctrl+Alt+B"`）或 `null`，**null 即关闭**
 - 设置页提供按键录制输入框（捕获 keydown 生成 accelerator），保存时后端先注销旧快捷键再注册新；注册失败（按键被占用）返回错误提示用户
 - 设置变更即时生效，无需重启；快捷键切换暂停时同步托盘勾选状态

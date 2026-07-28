@@ -8,7 +8,8 @@ interface BreakSettings {
 
 interface Hotkeys {
   breakNow: string | null;
-  togglePause: string | null;
+  toggleEnabled: string | null;
+  endBreak: string | null;
   openSettings: string | null;
 }
 
@@ -67,7 +68,8 @@ for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
 
 const HOTKEY_INPUTS = {
   breakNow: "hk-break-now",
-  togglePause: "hk-toggle-pause",
+  toggleEnabled: "hk-toggle-enabled",
+  endBreak: "hk-end-break",
   openSettings: "hk-open-settings",
 } as const;
 
@@ -100,7 +102,8 @@ function collectForm(): Settings {
     },
     hotkeys: {
       breakNow: hotkeyValue(HOTKEY_INPUTS.breakNow),
-      togglePause: hotkeyValue(HOTKEY_INPUTS.togglePause),
+      toggleEnabled: hotkeyValue(HOTKEY_INPUTS.toggleEnabled),
+      endBreak: hotkeyValue(HOTKEY_INPUTS.endBreak),
       openSettings: hotkeyValue(HOTKEY_INPUTS.openSettings),
     },
     global: {

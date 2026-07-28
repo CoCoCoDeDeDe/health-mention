@@ -16,7 +16,8 @@ pub struct BreakSettings {
 #[serde(rename_all = "camelCase")]
 pub struct Hotkeys {
     pub break_now: Option<String>,
-    pub toggle_pause: Option<String>,
+    pub toggle_enabled: Option<String>,
+    pub end_break: Option<String>,
     pub open_settings: Option<String>,
 }
 
@@ -52,7 +53,8 @@ impl Default for Settings {
             },
             hotkeys: Hotkeys {
                 break_now: None,
-                toggle_pause: None,
+                toggle_enabled: None,
+                end_break: None,
                 open_settings: None,
             },
             global: GlobalSettings {

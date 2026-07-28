@@ -68,3 +68,15 @@ pub fn toggle_pause(app: &AppHandle) {
     }
     state.scheduler.lock().unwrap().reload(&settings);
 }
+
+/// 开关「启用提醒」（快捷键动作）
+pub fn toggle_enabled(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let settings = {
+        let mut settings_guard = state.settings.lock().unwrap();
+        settings_guard.break_.enabled = !settings_guard.break_.enabled;
+        let _ = settings::save(&state.settings_path, &settings_guard);
+        settings_guard.clone()
+    };
+    state.scheduler.lock().unwrap().reload(&settings);
+}
