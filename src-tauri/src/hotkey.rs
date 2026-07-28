@@ -4,6 +4,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 /// 快捷键按下时的分发：与托盘菜单行为一致
 pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
+    eprintln!("hotkey pressed: {shortcut:?}");
     let hotkeys = app.state::<AppState>().settings.lock().unwrap().hotkeys.clone();
     let matches = |acc: &Option<String>| {
         acc.as_deref()
@@ -12,13 +13,19 @@ pub fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut) {
             == Some(shortcut)
     };
     if matches(&hotkeys.break_now) {
+        eprintln!("hotkey action: break_now");
         session::start_session(app, "manual");
     } else if matches(&hotkeys.toggle_enabled) {
+        eprintln!("hotkey action: toggle_enabled");
         tray::toggle_enabled(app);
     } else if matches(&hotkeys.end_break) {
+        eprintln!("hotkey action: end_break");
         session::end_session(app, "stopped");
     } else if matches(&hotkeys.open_settings) {
+        eprintln!("hotkey action: open_settings");
         tray::show_main_window(app);
+    } else {
+        eprintln!("hotkey action: no match");
     }
 }
 

@@ -48,9 +48,12 @@
 
 - 会话开始时枚举显示器（`available_monitors`），**每个显示器创建一个 `overlay-N` 窗口**：浮窗模式初始 320×44、各屏居中；全屏模式各屏全屏；会话结束统一 `destroy`
 - 窗口内容**只有一根进度条**：
-  - 浮窗：左键拖拽移动（`startDragging`）、右下角手柄调整宽高（`setSize`，最小 120×28）
+  - 浮窗：左键拖拽移动（位移超 4px 才 `startDragging`，不吞双击）、右下角手柄调整宽高（`setSize`，最小 120×28）
   - **双击进度条 = 提前结束**；Alt+F4 关闭任一 overlay 也视为提前结束
   - 各窗口移动/调整各自独立，不同步
+- 建窗 `focused(false)` + `focusable(false)`：不夺取输入焦点
+- 位置/宽高记忆：overlay 前端每 2s 上报 rect（`save_overlay_rect`，仅变化时写 `overlay-rects.json`），建窗时优先使用
+- 预览：设置页「预览休息浮窗」开关（`set/get_overlay_preview`），无会话时 overlay 显示静态半条用于调整；会话开始时自动关闭预览并重建窗口
 - capabilities 用 `overlay-*` 匹配动态窗口标签，附加 `start-dragging` / `set-size` / `close` 权限
 
 ## 全局快捷键

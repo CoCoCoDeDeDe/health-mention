@@ -10,6 +10,7 @@ use scheduler::Scheduler;
 use serde::Serialize;
 use session::{ActiveSession, BreakStatePayload};
 use settings::Settings;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -25,6 +26,11 @@ pub struct AppState {
     pub session_seq: Mutex<u64>,
     /// 托盘「暂停提醒」勾选框句柄，用于快捷键切换时同步勾选状态
     pub pause_item: Mutex<Option<CheckMenuItem<tauri::Wry>>>,
+    /// 设置页「预览休息浮窗」开关状态
+    pub overlay_preview: Mutex<bool>,
+    /// 各 overlay 窗口记忆的位置与宽高（按窗口标签）
+    pub overlay_rects: Mutex<HashMap<String, storage::OverlayRect>>,
+    pub rects_path: PathBuf,
 }
 
 #[derive(Serialize, Clone)]
@@ -106,6 +112,30 @@ fn get_stats(state: State<AppState>) -> stats::Stats {
     stats::get_stats(&state.logs_dir)
 }
 
+#[tauri::command]
+fn save_overlay_rect(
+    state: State<AppState>,
+    label: String,
+    rect: storage::OverlayRect,
+) -> Result<(), String> {
+    let mut rects = state.overlay_rects.lock().unwrap();
+    if rects.get(&label) == Some(&rect) {
+        return Ok(());
+    }
+    rects.insert(label, rect);
+    storage::save_overlay_rects(&state.rects_path, &rects)
+}
+
+#[tauri::command]
+fn set_overlay_preview(app: tauri::AppHandle, open: bool) {
+    session::set_preview(&app, open);
+}
+
+#[tauri::command]
+fn get_overlay_preview(state: State<AppState>) -> bool {
+    *state.overlay_preview.lock().unwrap()
+}
+
 /// 计算当前调度状态（下一次休息倒计时）。
 fn schedule_state(state: &AppState, in_session: bool) -> ScheduleTickPayload {
     let settings = state.settings.lock().unwrap();
@@ -176,6 +206,7 @@ fn main() {
             std::fs::create_dir_all(&dir).ok();
             let settings_path = dir.join("settings.json");
             let settings = settings::load(&settings_path);
+            let rects_path = dir.join("overlay-rects.json");
             app.manage(AppState {
                 scheduler: Mutex::new(Scheduler::new(&settings)),
                 settings: Mutex::new(settings),
@@ -184,6 +215,9 @@ fn main() {
                 session: Mutex::new(None),
                 session_seq: Mutex::new(0),
                 pause_item: Mutex::new(None),
+                overlay_preview: Mutex::new(false),
+                overlay_rects: Mutex::new(storage::load_overlay_rects(&rects_path)),
+                rects_path,
             });
             tray::setup_tray(&app.handle())?;
 
@@ -246,7 +280,10 @@ fn main() {
             get_break_state,
             get_schedule_state,
             list_logs,
-            get_stats
+            get_stats,
+            save_overlay_rect,
+            set_overlay_preview,
+            get_overlay_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

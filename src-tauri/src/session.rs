@@ -50,6 +50,24 @@ pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
     })
 }
 
+/// 设置页「预览休息浮窗」开关：展示/隐藏静态预览窗（无会话）。
+pub fn set_preview(app: &AppHandle, open: bool) {
+    *app.state::<AppState>().overlay_preview.lock().unwrap() = open;
+    if open {
+        let mode = app
+            .state::<AppState>()
+            .settings
+            .lock()
+            .unwrap()
+            .global
+            .overlay_mode
+            .clone();
+        show_overlays(app, &mode);
+    } else {
+        hide_overlays(app);
+    }
+}
+
 /// 开启一个休息会话；已有会话进行中时忽略。
 pub fn start_session(app: &AppHandle, trigger: &str) {
     let state = app.state::<AppState>();
@@ -70,6 +88,8 @@ pub fn start_session(app: &AppHandle, trigger: &str) {
             started: Instant::now(),
             trigger: trigger.to_string(),
         });
+        // 预览若开着，随真实会话关闭（窗口会重建为真实倒计时）
+        *state.overlay_preview.lock().unwrap() = false;
         (seq, planned, mode)
     };
 
@@ -126,9 +146,10 @@ pub fn end_session(app: &AppHandle, result: &str) {
     state.scheduler.lock().unwrap().reload(&settings);
 }
 
-/// 每个显示器各创建一个 overlay 窗口：初始同尺寸、各自居中，
-/// 之后移动/调整各自独立。
+/// 每个显示器各创建一个 overlay 窗口：优先使用记忆的位置与宽高，
+/// 否则初始同尺寸、各自居中。先销毁已有窗口保证状态干净。
 fn show_overlays(app: &AppHandle, mode: &str) {
+    hide_overlays(app);
     let monitors = app.available_monitors().unwrap_or_default();
     if monitors.is_empty() {
         // 兜底：拿不到显示器信息时至少创建一个默认位置的窗口
@@ -140,24 +161,31 @@ fn show_overlays(app: &AppHandle, mode: &str) {
     }
 }
 
-fn build_overlay(
-    app: &AppHandle,
-    label: &str,
-    mode: &str,
-    monitor: Option<&tauri::Monitor>,
-) {
+fn build_overlay(app: &AppHandle, label: &str, mode: &str, monitor: Option<&tauri::Monitor>) {
     if app.get_webview_window(label).is_some() {
         return;
     }
+    let saved = app
+        .state::<AppState>()
+        .overlay_rects
+        .lock()
+        .unwrap()
+        .get(label)
+        .copied();
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("overlay.html".into()))
         .title("休息一下")
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(true)
+        // 不夺取输入焦点，避免打断用户打字
+        .focused(false)
+        .focusable(false)
         .visible(true);
     if mode == "fullscreen" {
         builder = builder.fullscreen(true);
+    } else if let Some(r) = saved {
+        builder = builder.inner_size(r.w, r.h).position(r.x, r.y);
     } else if let Some(m) = monitor {
         let scale = m.scale_factor();
         let mw = m.size().width as f64 / scale;
