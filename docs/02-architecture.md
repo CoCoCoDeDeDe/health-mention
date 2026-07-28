@@ -41,7 +41,7 @@
 - 会话结束：倒计时归零 → `done`；用户提前结束 → `stopped`；写一条记录后重置计时器
 - 手动休息：托盘菜单或快捷键「立即休息」→ 立即开启会话（`trigger = manual`）；会话进行中重复触发则忽略
 - 倒计时渲染由 overlay 前端本地进行，后端只发开始/结束事件并权威记录结果
-- 下一次休息倒计时：tick 线程每秒更新托盘 tooltip 并广播 `schedule://tick {remainingSec, status}`，设置页实时显示；status ∈ running / paused / disabled / inSession
+- 下一次休息倒计时：tick 线程每秒更新托盘 tooltip；设置页每秒调用 `get_schedule_state` 拉取 `{remainingSec, status}` 实时显示；status ∈ running / paused / disabled / inSession
 
 ## 全局快捷键
 

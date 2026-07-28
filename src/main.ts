@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 
 interface BreakSettings {
   intervalMin: number;
@@ -114,14 +113,21 @@ function fmtRemain(sec: number): string {
   return `${s} 秒`;
 }
 
-listen<ScheduleTick>("schedule://tick", (e) => {
-  const { remainingSec, status } = e.payload;
-  el("next-break").textContent =
-    status === "running" && remainingSec != null
-      ? `距离下次休息：${fmtRemain(remainingSec)}`
-      : status === "paused"
-        ? "提醒已暂停"
-        : status === "disabled"
-          ? "提醒已禁用"
-          : "休息中…";
-}).catch(console.error);
+async function pollSchedule(): Promise<void> {
+  try {
+    const { remainingSec, status } = await invoke<ScheduleTick>("get_schedule_state");
+    el("next-break").textContent =
+      status === "running" && remainingSec != null
+        ? `距离下次休息：${fmtRemain(remainingSec)}`
+        : status === "paused"
+          ? "提醒已暂停"
+          : status === "disabled"
+            ? "提醒已禁用"
+            : "休息中…";
+  } catch (e) {
+    el("next-break").textContent = `状态获取失败：${e}`;
+  }
+}
+
+setInterval(pollSchedule, 1000);
+pollSchedule();

@@ -11,7 +11,7 @@ use settings::Settings;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{Emitter, Manager, State};
+use tauri::{Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 pub struct AppState {
@@ -84,34 +84,50 @@ fn get_break_state(app: tauri::AppHandle) -> Option<BreakStatePayload> {
     session::get_break_state(&app)
 }
 
-/// 每秒：更新托盘 tooltip、广播 schedule://tick
-fn broadcast_schedule_tick(handle: &tauri::AppHandle, in_session: bool) {
-    let state = handle.state::<AppState>();
-    let (status, remaining_sec) = {
-        let settings = state.settings.lock().unwrap();
-        if in_session {
-            ("inSession", None)
-        } else if settings.global.paused {
-            ("paused", None)
-        } else if !settings.break_.enabled {
-            ("disabled", None)
-        } else {
-            (
-                "running",
-                state
-                    .scheduler
-                    .lock()
-                    .unwrap()
-                    .remaining()
-                    .map(|d| d.as_secs_f64()),
-            )
-        }
-    };
+#[tauri::command]
+fn get_schedule_state(state: State<AppState>) -> ScheduleTickPayload {
+    let in_session = state.session.lock().unwrap().is_some();
+    schedule_state(&state, in_session)
+}
 
+/// 计算当前调度状态（下一次休息倒计时）。
+fn schedule_state(state: &AppState, in_session: bool) -> ScheduleTickPayload {
+    let settings = state.settings.lock().unwrap();
+    if in_session {
+        ScheduleTickPayload {
+            remaining_sec: None,
+            status: "inSession",
+        }
+    } else if settings.global.paused {
+        ScheduleTickPayload {
+            remaining_sec: None,
+            status: "paused",
+        }
+    } else if !settings.break_.enabled {
+        ScheduleTickPayload {
+            remaining_sec: None,
+            status: "disabled",
+        }
+    } else {
+        ScheduleTickPayload {
+            remaining_sec: state
+                .scheduler
+                .lock()
+                .unwrap()
+                .remaining()
+                .map(|d| d.as_secs_f64()),
+            status: "running",
+        }
+    }
+}
+
+/// 每秒更新托盘 tooltip。
+fn update_tray_tooltip(handle: &tauri::AppHandle, in_session: bool) {
+    let payload = schedule_state(&handle.state::<AppState>(), in_session);
     if let Some(tray) = handle.tray_by_id(tray::TRAY_ID) {
-        let tooltip = match remaining_sec {
+        let tooltip = match payload.remaining_sec {
             Some(s) => format!("health-mention · {} 后休息", fmt_hms(s)),
-            None => match status {
+            None => match payload.status {
                 "paused" => "health-mention · 已暂停".to_string(),
                 "disabled" => "health-mention · 提醒已禁用".to_string(),
                 _ => "health-mention · 休息中".to_string(),
@@ -119,14 +135,6 @@ fn broadcast_schedule_tick(handle: &tauri::AppHandle, in_session: bool) {
         };
         let _ = tray.set_tooltip(Some(&tooltip));
     }
-
-    let _ = handle.emit(
-        "schedule://tick",
-        ScheduleTickPayload {
-            remaining_sec,
-            status,
-        },
-    );
 }
 
 fn main() {
@@ -153,7 +161,7 @@ fn main() {
             });
             tray::setup_tray(&app.handle())?;
 
-            // 调度器 tick：每秒检查到期 + 广播下一次休息倒计时
+            // 调度器 tick：每秒检查到期 + 更新托盘 tooltip
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
                 std::thread::sleep(Duration::from_secs(1));
@@ -164,7 +172,7 @@ fn main() {
                 if due && !in_session {
                     session::start_session(&handle, "scheduled");
                 } else {
-                    broadcast_schedule_tick(&handle, in_session);
+                    update_tray_tooltip(&handle, in_session);
                 }
             });
 
@@ -187,7 +195,8 @@ fn main() {
             save_settings,
             trigger_break,
             end_break,
-            get_break_state
+            get_break_state,
+            get_schedule_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
