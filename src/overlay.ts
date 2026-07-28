@@ -26,7 +26,7 @@ if (!state && !preview) {
   } else {
     grip.classList.remove("hidden");
     setupDragAndResize();
-    persistRectLoop();
+    setupRectPersistence();
   }
 
   if (state) {
@@ -106,9 +106,9 @@ function setupDragAndResize(): void {
   });
 }
 
-/** 每 2 秒上报本窗口位置与宽高，后端按标签记忆（仅变化时写盘） */
-function persistRectLoop(): void {
-  setInterval(() => {
+/** 记忆本窗口位置与宽高：移动/缩放结束即保存（300ms 防抖），另有 2s 轮询兜底 */
+function setupRectPersistence(): void {
+  const report = () => {
     Promise.all([win.outerPosition(), win.innerSize(), win.scaleFactor()])
       .then(([pos, size, scale]) =>
         invoke("save_overlay_rect", {
@@ -122,5 +122,13 @@ function persistRectLoop(): void {
         })
       )
       .catch(() => {});
-  }, 2000);
+  };
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const debounced = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(report, 300);
+  };
+  win.onMoved(debounced).catch(() => {});
+  win.onResized(debounced).catch(() => {});
+  setInterval(report, 2000);
 }

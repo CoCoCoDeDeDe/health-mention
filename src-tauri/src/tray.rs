@@ -71,12 +71,10 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 pub fn update_stats_item(app: &AppHandle) {
     let state = app.state::<AppState>();
     let s = stats::get_stats(&state.logs_dir);
+    let text = format!("今日完成 {} 次 · 连续 {} 天", s.today_done, s.streak_days);
     if let Some(item) = state.stats_item.lock().unwrap().as_ref() {
-        let _ = item.set_text(format!(
-            "今日完成 {} 次 · 连续 {} 天",
-            s.today_done, s.streak_days
-        ));
-    }
+        let _ = item.set_text(&text);
+    };
 }
 
 pub fn show_main_window(app: &AppHandle) {
