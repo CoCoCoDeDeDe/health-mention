@@ -37,18 +37,20 @@ pub struct BreakStatePayload {
     pub elapsed_sec: f64,
     pub mode: String,
     pub trigger: String,
+    pub progress_plugin: Option<String>,
 }
 
 pub fn get_break_state(app: &AppHandle) -> Option<BreakStatePayload> {
     let state = app.state::<AppState>();
     let session = state.session.lock().unwrap();
     session.as_ref().map(|s| {
-        let mode = state.settings.lock().unwrap().global.overlay_mode.clone();
+        let settings = state.settings.lock().unwrap();
         BreakStatePayload {
             planned_sec: s.planned_sec,
             elapsed_sec: s.started.elapsed().as_secs_f64(),
-            mode,
+            mode: settings.global.overlay_mode.clone(),
             trigger: s.trigger.clone(),
+            progress_plugin: settings.global.progress_plugin.clone(),
         }
     })
 }

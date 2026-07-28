@@ -88,7 +88,8 @@ export default {
   // ctx: { durationSec: number, mode: 'float' | 'fullscreen' }
   mount(el, ctx) {
     return {
-      // state: { progress: 0..1, remainingSec: number }
+      // state: { progress: 0..1, remainingSec: number,
+      //          phase: 'countdown' | 'overtime', elapsedSec: number }
       update(state) {},
       unmount() {}
     };
@@ -96,7 +97,7 @@ export default {
 };
 ```
 
-加载流程：后端扫描目录 → 前端经 blob URL 动态 `import()` → 校验导出结构 → `mount` 全过程 try/catch，**任何失败回退内置默认进度条**。
+加载流程：后端扫描目录（`list_progress_plugins` / `read_progress_plugin`）→ 前端经 blob URL 动态 `import()` → 校验导出结构 → `mount` 全过程 try/catch，**任何失败回退内置默认进度条**。要求 tauri.conf.json 保持 `csp: null`（blob import 需要）。示例见 `examples/progress-plugin-sample/`。
 
 **主题（设置窗口风格自定义）**：`<app_data>/themes/<主题名>.css`，纯 CSS 变量覆盖（`--bg`、`--fg`、`--accent`、圆角等），设置页下拉选择，即选即用。这比"整个窗口换组件"轻得多，首期足够。
 

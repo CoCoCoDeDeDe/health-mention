@@ -6,6 +6,29 @@ interface BreakState {
   elapsedSec: number;
   mode: string;
   trigger: string;
+  progressPlugin: string | null;
+}
+
+interface PluginFiles {
+  componentJs: string;
+  styleCss: string | null;
+}
+
+interface ComponentCtx {
+  durationSec: number;
+  mode: string;
+}
+
+interface ComponentState {
+  progress: number;
+  remainingSec: number;
+  phase: "countdown" | "overtime";
+  elapsedSec: number;
+}
+
+interface ComponentHandle {
+  update(state: ComponentState): void;
+  unmount?(): void;
 }
 
 const win = getCurrentWindow();
@@ -13,6 +36,7 @@ const track = document.getElementById("bar-track") as HTMLDivElement;
 const bar = document.getElementById("bar") as HTMLDivElement;
 const grip = document.getElementById("grip") as HTMLDivElement;
 const otText = document.getElementById("ot-text") as HTMLSpanElement;
+const customRoot = document.getElementById("custom-root") as HTMLDivElement;
 
 const state = await invoke<BreakState | null>("get_break_state");
 
@@ -20,11 +44,40 @@ if (!state) {
   // 无会话（如会话已结束窗口残留），直接关闭
   await win.close();
 } else {
+  // 尝试加载自定义进度组件；任何失败回退内置进度条
+  let custom: ComponentHandle | null = null;
+  if (state.progressPlugin) {
+    custom = await loadCustomComponent(state.progressPlugin, {
+      durationSec: state.plannedSec,
+      mode: state.mode,
+    }).catch((e) => {
+      console.error("custom progress component failed, fallback to default:", e);
+      return null;
+    });
+  }
+
+  if (custom) {
+    track.classList.add("hidden"); // 自定义组件接管渲染区域
+  }
+
+  const render = (
+    progress: number,
+    remainingSec: number,
+    phase: "countdown" | "overtime",
+    elapsedSec: number
+  ) => {
+    if (custom) {
+      custom.update({ progress: Math.min(1, progress), remainingSec, phase, elapsedSec });
+    } else {
+      bar.style.width = `${(Math.min(1, progress) * 100).toFixed(1)}%`;
+    }
+  };
+
   if (state.mode === "fullscreen") {
     document.body.classList.add("fullscreen");
   } else {
     grip.classList.remove("hidden");
-    setupDragAndResize();
+    setupDragAndResize(custom ? customRoot : track);
     setupRectPersistence();
   }
 
@@ -34,9 +87,9 @@ if (!state) {
   });
 
   if (state.trigger === "manual") {
-    runManual(state);
+    runManual(state, render, custom === null);
   } else {
-    runScheduled(state);
+    runScheduled(state, render);
   }
 
   // 首帧绘制完成后通知后端显示窗口（窗口先隐藏建出，避免白闪）
@@ -47,35 +100,76 @@ if (!state) {
   });
 }
 
+/** 加载并挂载自定义组件；结构不符或抛错时向上抛（调用方回退） */
+async function loadCustomComponent(
+  name: string,
+  ctx: ComponentCtx
+): Promise<ComponentHandle | null> {
+  const files = await invoke<PluginFiles>("read_progress_plugin", { name });
+  if (files.styleCss) {
+    const style = document.createElement("style");
+    style.textContent = files.styleCss;
+    document.head.appendChild(style);
+  }
+  const blob = new Blob([files.componentJs], { type: "text/javascript" });
+  const url = URL.createObjectURL(blob);
+  let mod: { default?: { mount?: unknown } };
+  try {
+    mod = await import(/* @vite-ignore */ url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  const def = mod.default;
+  if (!def || typeof def.mount !== "function") {
+    throw new Error("component.js 缺少 default export 的 mount(el, ctx)");
+  }
+  const handle = (def.mount as (el: HTMLElement, ctx: ComponentCtx) => ComponentHandle)(
+    customRoot,
+    ctx
+  );
+  if (!handle || typeof handle.update !== "function") {
+    throw new Error("mount 返回值缺少 update(state)");
+  }
+  return handle;
+}
+
 /** 定时休息：倒计时跑完由后端自动结束 */
-function runScheduled(state: BreakState): void {
+function runScheduled(
+  state: BreakState,
+  render: (p: number, r: number, phase: "countdown" | "overtime", e: number) => void
+): void {
   const endAt = Date.now() + (state.plannedSec - state.elapsedSec) * 1000;
   const update = () => {
     const remainingMs = Math.max(0, endAt - Date.now());
-    const progress = Math.min(1, 1 - remainingMs / 1000 / state.plannedSec);
-    bar.style.width = `${(progress * 100).toFixed(1)}%`;
+    const remainingSec = remainingMs / 1000;
+    render(1 - remainingSec / state.plannedSec, remainingSec, "countdown", state.plannedSec - remainingSec);
     if (remainingMs <= 0) clearInterval(timer);
   };
   const timer = setInterval(update, 200);
   update();
 }
 
-/** 手动休息：先倒计时跑完计划时长，再转为正计时（不自动退出），
- *  中央显示累计休息时长；分母随量级切换（1 小时 / 1 天 / 7 天） */
-function runManual(state: BreakState): void {
+/** 手动休息：先倒计时跑完计划时长，再转为正计时（不自动退出） */
+function runManual(
+  state: BreakState,
+  render: (p: number, r: number, phase: "countdown" | "overtime", e: number) => void,
+  useDefault: boolean
+): void {
   const startStamp = Date.now() - state.elapsedSec * 1000;
   const plannedMs = state.plannedSec * 1000;
   const update = () => {
     const elapsedMs = Date.now() - startStamp;
+    const elapsed = elapsedMs / 1000;
     if (elapsedMs < plannedMs) {
-      bar.style.width = `${((elapsedMs / plannedMs) * 100).toFixed(1)}%`;
-      otText.classList.add("hidden");
+      if (useDefault) otText.classList.add("hidden");
+      render(elapsedMs / plannedMs, (plannedMs - elapsedMs) / 1000, "countdown", elapsed);
       return;
     }
-    const elapsed = elapsedMs / 1000;
-    otText.classList.remove("hidden");
-    otText.textContent = fmtElapsed(elapsed);
-    bar.style.width = `${(Math.min(1, elapsed / denominator(elapsed)) * 100).toFixed(1)}%`;
+    render(elapsed / denominator(elapsed), 0, "overtime", elapsed);
+    if (useDefault) {
+      otText.classList.remove("hidden");
+      otText.textContent = fmtElapsed(elapsed);
+    }
   };
   const timer = setInterval(update, 250);
   update();
@@ -99,9 +193,9 @@ function fmtElapsed(sec: number): string {
   return `已休息 ${m} 分 ${s} 秒`;
 }
 
-function setupDragAndResize(): void {
+function setupDragAndResize(surface: HTMLElement): void {
   // 按住移动超过阈值才拖拽，避免吃掉双击
-  track.addEventListener("mousedown", (e) => {
+  surface.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     const startX = e.screenX;
     const startY = e.screenY;

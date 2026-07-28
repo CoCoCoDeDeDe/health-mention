@@ -1,0 +1,20 @@
+/* 示例主题：夜间深蓝
+   用法：复制到 %APPDATA%\com.cococodedede.health-mention\themes\夜间深蓝.css
+   然后在设置页「主题」里选择。只覆盖 CSS 变量即可。 */
+:root {
+  --bg: #1d2b36;
+  --card: #24394a;
+  --fg: #cfe3f0;
+  --fg-dim: #7d9db5;
+  --accent: #5b9bd5;
+  --accent-hover: #4a86bd;
+  --border: #33506a;
+  --radius: 10px;
+}
+
+/* 深色主题下输入控件底色也要跟着变 */
+.row input[type="number"],
+.row select,
+.hotkey-wrap input {
+  background: #1d2b36;
+}

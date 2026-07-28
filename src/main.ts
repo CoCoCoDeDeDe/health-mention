@@ -47,6 +47,13 @@ interface Stats {
   streakDays: number;
 }
 
+interface PluginMeta {
+  dirName: string;
+  name: string;
+  version: string | null;
+  author: string | null;
+}
+
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) throw new Error(`missing element #${id}`);
@@ -82,6 +89,8 @@ function fillForm(s: Settings): void {
   el<HTMLInputElement>("duration-sec").value = String(s.break.durationSec);
   el<HTMLSelectElement>("overlay-mode").value = s.global.overlayMode;
   el<HTMLInputElement>("autostart").checked = s.global.autostart;
+  el<HTMLSelectElement>("theme").value = s.global.theme;
+  el<HTMLSelectElement>("progress-plugin").value = s.global.progressPlugin ?? "";
   for (const [key, id] of Object.entries(HOTKEY_INPUTS)) {
     el<HTMLInputElement>(id).value = s.hotkeys[key as keyof Hotkeys] ?? "";
   }
@@ -111,13 +120,17 @@ function collectForm(): Settings {
       ...current.global,
       overlayMode: el<HTMLSelectElement>("overlay-mode").value,
       autostart: el<HTMLInputElement>("autostart").checked,
+      theme: el<HTMLSelectElement>("theme").value,
+      progressPlugin: el<HTMLSelectElement>("progress-plugin").value || null,
     },
   };
 }
 
 async function load(): Promise<void> {
   current = await invoke<Settings>("get_settings");
+  await loadAppearanceOptions();
   fillForm(current);
+  await applyTheme(current.global.theme);
   setDirty(false);
 }
 
@@ -150,6 +163,54 @@ function setDirty(v: boolean): void {
 
 el("tab-settings").addEventListener("input", () => setDirty(true));
 el("tab-settings").addEventListener("change", () => setDirty(true));
+
+// ---- appearance (theme & progress plugin) ----
+
+/** 应用主题（CSS 变量覆盖）；default = 移除覆盖 */
+async function applyTheme(name: string): Promise<void> {
+  let styleEl = document.getElementById("theme-override");
+  if (name === "default") {
+    styleEl?.remove();
+    return;
+  }
+  try {
+    const css = await invoke<string>("read_theme", { name });
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "theme-override";
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = css;
+  } catch (e) {
+    console.error("read theme failed:", e);
+  }
+}
+
+async function loadAppearanceOptions(): Promise<void> {
+  const themeSel = el<HTMLSelectElement>("theme");
+  const pluginSel = el<HTMLSelectElement>("progress-plugin");
+  try {
+    const themes = await invoke<string[]>("list_themes");
+    themeSel.innerHTML =
+      '<option value="default">默认</option>' +
+      themes.map((t) => `<option value="${t}">${t}</option>`).join("");
+  } catch {
+    themeSel.innerHTML = '<option value="default">默认</option>';
+  }
+  try {
+    const plugins = await invoke<PluginMeta[]>("list_progress_plugins");
+    pluginSel.innerHTML =
+      '<option value="">内置默认</option>' +
+      plugins.map((p) => `<option value="${p.dirName}">${p.name}</option>`).join("");
+  } catch {
+    pluginSel.innerHTML = '<option value="">内置默认</option>';
+  }
+}
+
+// 主题切换即时预览（保存才持久化；脏状态由 change 监听统一标记）
+el("theme").addEventListener("change", () => {
+  applyTheme(el<HTMLSelectElement>("theme").value);
+});
 
 // ---- hotkey capture ----
 

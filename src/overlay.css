@@ -52,6 +52,12 @@ body {
   pointer-events: none;
 }
 
+#custom-root {
+  position: absolute;
+  inset: 0;
+  cursor: move;
+}
+
 #grip {
   position: absolute;
   right: 2px;

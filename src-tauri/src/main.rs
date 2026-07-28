@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod hotkey;
+mod plugin;
 mod scheduler;
 mod session;
 mod settings;
@@ -40,6 +41,10 @@ pub struct AppState {
     /// 各窗口记忆的位置与宽高（按窗口标签，含 main）
     pub overlay_rects: Mutex<HashMap<String, storage::OverlayRect>>,
     pub rects_path: PathBuf,
+    /// 用户自定义进度组件目录（plugins/progress）
+    pub plugins_dir: PathBuf,
+    /// 用户自定义主题目录（themes）
+    pub themes_dir: PathBuf,
 }
 
 #[derive(Serialize, Clone)]
@@ -158,6 +163,29 @@ fn save_overlay_rect(
     storage::save_overlay_rects(&state.rects_path, &rects)
 }
 
+#[tauri::command]
+fn list_progress_plugins(state: State<AppState>) -> Vec<plugin::PluginMeta> {
+    plugin::list_progress_plugins(&state.plugins_dir)
+}
+
+#[tauri::command]
+fn read_progress_plugin(
+    state: State<AppState>,
+    name: String,
+) -> Result<plugin::PluginFiles, String> {
+    plugin::read_progress_plugin(&state.plugins_dir, &name)
+}
+
+#[tauri::command]
+fn list_themes(state: State<AppState>) -> Vec<String> {
+    plugin::list_themes(&state.themes_dir)
+}
+
+#[tauri::command]
+fn read_theme(state: State<AppState>, name: String) -> Result<String, String> {
+    plugin::read_theme(&state.themes_dir, &name)
+}
+
 /// 计算当前调度状态（下一次休息倒计时）。
 fn schedule_state(state: &AppState, in_session: bool) -> ScheduleTickPayload {
     let settings = state.settings.lock().unwrap();
@@ -243,6 +271,10 @@ fn main() {
             let settings_path = dir.join("settings.json");
             let settings = settings::load(&settings_path);
             let rects_path = dir.join("overlay-rects.json");
+            let plugins_dir = dir.join("plugins").join("progress");
+            let themes_dir = dir.join("themes");
+            std::fs::create_dir_all(&plugins_dir).ok();
+            std::fs::create_dir_all(&themes_dir).ok();
             app.manage(AppState {
                 scheduler: Mutex::new(Scheduler::new(&settings)),
                 settings: Mutex::new(settings),
@@ -256,6 +288,8 @@ fn main() {
                 stats_item: Mutex::new(None),
                 overlay_rects: Mutex::new(storage::load_overlay_rects(&rects_path)),
                 rects_path,
+                plugins_dir,
+                themes_dir,
             });
             tray::setup_tray(&app.handle())?;
             tray::update_stats_item(&app.handle());
@@ -351,7 +385,11 @@ fn main() {
             list_logs,
             get_stats,
             clear_logs,
-            save_overlay_rect
+            save_overlay_rect,
+            list_progress_plugins,
+            read_progress_plugin,
+            list_themes,
+            read_theme
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
