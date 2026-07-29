@@ -62,13 +62,16 @@ function el<T extends HTMLElement>(id: string): T {
 
 // ---- tabs ----
 
+let activeTab = "settings";
+
 for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
   tab.addEventListener("click", () => {
     for (const t of document.querySelectorAll(".tab")) t.classList.remove("active");
     tab.classList.add("active");
     for (const panel of document.querySelectorAll(".tab-panel")) panel.classList.add("hidden");
-    el(`tab-${tab.dataset.tab}`).classList.remove("hidden");
-    if (tab.dataset.tab === "logs") loadLogs().catch(console.error);
+    activeTab = tab.dataset.tab ?? "settings";
+    el(`tab-${activeTab}`).classList.remove("hidden");
+    if (activeTab === "logs") loadLogs().catch(console.error);
   });
 }
 
@@ -128,7 +131,7 @@ function collectForm(): Settings {
 
 async function load(): Promise<void> {
   current = await invoke<Settings>("get_settings");
-  await loadAppearanceOptions();
+  await refreshAppearanceOptions();
   fillForm(current);
   await applyTheme(current.global.theme);
   setDirty(false);
@@ -186,31 +189,56 @@ async function applyTheme(name: string): Promise<void> {
   }
 }
 
-async function loadAppearanceOptions(): Promise<void> {
+let lastThemeSig: string | null = null;
+let lastPluginSig: string | null = null;
+
+/** 重扫主题/组件选项：仅列表变化时重建下拉并保留当前选择；
+ *  同时重应用当前主题（覆盖文件内容被编辑的情况） */
+async function refreshAppearanceOptions(): Promise<void> {
   const themeSel = el<HTMLSelectElement>("theme");
   const pluginSel = el<HTMLSelectElement>("progress-plugin");
   try {
     const themes = await invoke<string[]>("list_themes");
-    themeSel.innerHTML =
-      '<option value="default">默认</option>' +
-      themes.map((t) => `<option value="${t}">${t}</option>`).join("");
-  } catch {
-    themeSel.innerHTML = '<option value="default">默认</option>';
+    const sig = themes.join("|");
+    if (sig !== lastThemeSig) {
+      lastThemeSig = sig;
+      const cur = themeSel.value;
+      themeSel.innerHTML =
+        '<option value="default">默认</option>' +
+        themes.map((t) => `<option value="${t}">${t}</option>`).join("");
+      themeSel.value = themes.includes(cur) ? cur : "default";
+    }
+  } catch (e) {
+    console.error("list themes failed:", e);
   }
   try {
     const plugins = await invoke<PluginMeta[]>("list_progress_plugins");
-    pluginSel.innerHTML =
-      '<option value="">内置默认</option>' +
-      plugins.map((p) => `<option value="${p.dirName}">${p.name}</option>`).join("");
-  } catch {
-    pluginSel.innerHTML = '<option value="">内置默认</option>';
+    const sig = plugins.map((p) => p.dirName).join("|");
+    if (sig !== lastPluginSig) {
+      lastPluginSig = sig;
+      const cur = pluginSel.value;
+      pluginSel.innerHTML =
+        '<option value="">内置默认</option>' +
+        plugins.map((p) => `<option value="${p.dirName}">${p.name}</option>`).join("");
+      pluginSel.value = plugins.some((p) => p.dirName === cur) ? cur : "";
+    }
+  } catch (e) {
+    console.error("list plugins failed:", e);
   }
+  await applyTheme(themeSel.value);
 }
 
 // 主题切换即时预览（保存才持久化；脏状态由 change 监听统一标记）
 el("theme").addEventListener("change", () => {
   applyTheme(el<HTMLSelectElement>("theme").value);
 });
+
+// ---- live refresh：选项/主题每 5s 重扫；记录 tab 激活时每 5s 重载 ----
+
+setInterval(() => {
+  refreshAppearanceOptions().catch(() => {});
+  if (activeTab === "logs") loadLogs().catch(() => {});
+}, 5000);
 
 // ---- hotkey capture ----
 
