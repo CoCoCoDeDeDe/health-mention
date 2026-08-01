@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>health-mention</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <nav class="tabs">
+      <button class="tab active" data-tab="settings">设置</button>
+      <button class="tab" data-tab="logs">记录</button>
+    </nav>
+
+    <main id="tab-settings" class="tab-panel">
+      <section class="card">
+        <h2>休息提醒</h2>
+        <p class="hint" id="next-break">…</p>
+        <label class="row">
+          <input type="checkbox" id="break-enabled" />
+          <span>启用提醒</span>
+        </label>
+        <label class="row">
+          <span>间隔（分钟）</span>
+          <input type="number" id="interval-min" min="0.1" max="1440" step="0.1" />
+        </label>
+        <label class="row">
+          <span>休息时长（秒）</span>
+          <input type="number" id="duration-sec" min="1" max="3600" step="0.5" />
+        </label>
+        <label class="row">
+          <span>休息窗口形态</span>
+          <select id="overlay-mode">
+            <option value="float">小浮窗置顶</option>
+            <option value="fullscreen">全屏遮罩</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>全局快捷键</h2>
+        <label class="row">
+          <span>立即休息</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-break-now" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-break-now" title="清除">×</button>
+          </span>
+        </label>
+        <label class="row">
+          <span>开关启用提醒</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-toggle-enabled" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-toggle-enabled" title="清除">×</button>
+          </span>
+        </label>
+        <label class="row">
+          <span>手动结束休息</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-end-break" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-end-break" title="清除">×</button>
+          </span>
+        </label>
+        <label class="row">
+          <span>打开设置</span>
+          <span class="hotkey-wrap">
+            <input type="text" id="hk-open-settings" readonly placeholder="点击后按键录制" />
+            <button class="hk-clear" data-hk="hk-open-settings" title="清除">×</button>
+          </span>
+        </label>
+        <p class="hint">留空即关闭该快捷键；保存时生效，被占用会提示。</p>
+      </section>
+
+      <section class="card">
+        <h2>系统</h2>
+        <label class="row">
+          <input type="checkbox" id="autostart" />
+          <span>跟随系统自启动</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>外观与扩展</h2>
+        <label class="row">
+          <span>主题</span>
+          <select id="theme"></select>
+        </label>
+        <label class="row">
+          <span>进度组件</span>
+          <select id="progress-plugin"></select>
+        </label>
+        <p class="hint">主题放 themes\、进度组件放 plugins\progress\（应用数据目录），重开设置页后可选。</p>
+      </section>
+
+      <div class="actions">
+        <button id="save-btn" class="primary">保存</button>
+        <span id="save-status" class="hint"></span>
+      </div>
+    </main>
+
+    <main id="tab-logs" class="tab-panel hidden">
+      <section class="card">
+        <h2>统计</h2>
+        <p class="stats" id="stats-line">…</p>
+      </section>
+      <section class="card">
+        <h2>记录</h2>
+        <label class="row">
+          <span>日期</span>
+          <input type="date" id="log-date" />
+        </label>
+        <div id="log-list" class="log-list"></div>
+        <div class="actions log-actions">
+          <button id="clear-logs-btn" class="danger">清空历史</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

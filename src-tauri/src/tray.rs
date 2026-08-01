@@ -1,0 +1,127 @@
+use crate::{session, settings, stats, AppState};
+use tauri::{
+    menu::{CheckMenuItemBuilder, Menu, MenuItemBuilder, PredefinedMenuItem},
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager,
+};
+
+pub const TRAY_ID: &str = "tray";
+
+pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
+    let paused = app.state::<AppState>().settings.lock().unwrap().global.paused;
+
+    // 顶部信息项：倒计时 + 统计（禁用态，仅展示）
+    let info = MenuItemBuilder::with_id("info", "…").enabled(false).build(app)?;
+    let stats_info = MenuItemBuilder::with_id("stats", "…")
+        .enabled(false)
+        .build(app)?;
+    *app.state::<AppState>().info_item.lock().unwrap() = Some(info.clone());
+    *app.state::<AppState>().stats_item.lock().unwrap() = Some(stats_info.clone());
+
+    let show = MenuItemBuilder::with_id("show", "打开设置").build(app)?;
+    let break_now = MenuItemBuilder::with_id("break_now", "立即休息").build(app)?;
+    // 结束休息：仅休息会话进行中可用
+    let end_break = MenuItemBuilder::with_id("end_break", "结束休息")
+        .enabled(false)
+        .build(app)?;
+    *app.state::<AppState>().end_item.lock().unwrap() = Some(end_break.clone());
+    let pause = CheckMenuItemBuilder::with_id("toggle_pause", "暂停提醒")
+        .checked(paused)
+        .build(app)?;
+    // 保存句柄：快捷键切换暂停时同步菜单勾选状态
+    *app.state::<AppState>().pause_item.lock().unwrap() = Some(pause.clone());
+
+    let menu = Menu::with_items(
+        app,
+        &[
+            &info,
+            &stats_info,
+            &PredefinedMenuItem::separator(app)?,
+            &show,
+            &break_now,
+            &end_break,
+            &pause,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItemBuilder::with_id("quit", "退出").build(app)?,
+        ],
+    )?;
+
+    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
+        .menu(&menu)
+        // 菜单仅右键弹出；左键单击不弹，双击直接打开设置
+        .show_menu_on_left_click(false)
+        .tooltip("health-mention")
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "show" => show_main_window(app),
+            "break_now" => session::start_session(app, "manual"),
+            "end_break" => session::end_session(app, "stopped"),
+            "toggle_pause" => toggle_pause(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            // 双击左键直接打开设置窗口
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    Ok(())
+}
+
+/// 会话开始/结束时同步「结束休息」菜单项的可用状态
+pub fn set_end_enabled(app: &AppHandle, enabled: bool) {
+    if let Some(item) = app.state::<AppState>().end_item.lock().unwrap().as_ref() {
+        let _ = item.set_enabled(enabled);
+    };
+}
+
+/// 刷新托盘菜单顶部的统计文本
+pub fn update_stats_item(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let s = stats::get_stats(&state.logs_dir);
+    let text = format!("今日完成 {} 次 · 连续 {} 天", s.today_done, s.streak_days);
+    if let Some(item) = state.stats_item.lock().unwrap().as_ref() {
+        let _ = item.set_text(&text);
+    };
+}
+
+pub fn show_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+pub fn toggle_pause(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let (settings, paused) = {
+        let mut settings_guard = state.settings.lock().unwrap();
+        settings_guard.global.paused = !settings_guard.global.paused;
+        let _ = settings::save(&state.settings_path, &settings_guard);
+        (settings_guard.clone(), settings_guard.global.paused)
+    };
+    if let Some(item) = state.pause_item.lock().unwrap().as_ref() {
+        let _ = item.set_checked(paused);
+    }
+    state.scheduler.lock().unwrap().reload(&settings);
+}
+
+/// 开关「启用提醒」（快捷键动作）
+pub fn toggle_enabled(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let settings = {
+        let mut settings_guard = state.settings.lock().unwrap();
+        settings_guard.break_.enabled = !settings_guard.break_.enabled;
+        let _ = settings::save(&state.settings_path, &settings_guard);
+        settings_guard.clone()
+    };
+    state.scheduler.lock().unwrap().reload(&settings);
+}

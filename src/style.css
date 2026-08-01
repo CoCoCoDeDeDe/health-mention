@@ -1,0 +1,194 @@
+/* 护眼解压配色：低饱和绿 + 米白，CSS 变量预留给主题系统（M4） */
+:root {
+  --bg: #f2f5ee;
+  --card: #fafbf7;
+  --fg: #3d4a3a;
+  --fg-dim: #7a8676;
+  --accent: #6fa578;
+  --accent-hover: #5d9167;
+  --border: #dde4d5;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  user-select: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 6px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-dim);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.row input[type="number"],
+.row select {
+  width: 130px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--fg);
+}
+
+.row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button.primary {
+  padding: 8px 28px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* 有未保存修改时的保存按钮 */
+button.primary.dirty {
+  background: var(--accent-hover);
+  box-shadow: 0 0 0 3px rgba(111, 165, 120, 0.35);
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--fg-dim);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.hotkey-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hotkey-wrap input {
+  width: 160px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.hk-clear {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--fg-dim);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hk-clear:hover {
+  color: var(--fg);
+  border-color: var(--fg-dim);
+}
+
+.stats {
+  font-size: 15px;
+  margin: 4px 0;
+}
+
+.log-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.log-row {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.log-row:last-child {
+  border-bottom: none;
+}
+
+.log-actions {
+  margin-top: 10px;
+}
+
+button.danger {
+  padding: 5px 16px;
+  border: 1px solid #c98a8a;
+  border-radius: 8px;
+  background: transparent;
+  color: #b06060;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button.danger:hover {
+  background: #c98a8a;
+  color: #fff;
+}
+
+.hidden {
+  display: none;
+}
